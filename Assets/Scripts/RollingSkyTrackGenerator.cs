@@ -582,6 +582,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         if (trackData == null || trackData.tiles == null) return;
 
         GameObject root = GetOrCreateTrackRoot(clearExisting: true);
+        Transform parent = root.transform;
         int highestRow = 0;
         foreach (var tile in trackData.tiles)
         {
