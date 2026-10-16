@@ -582,10 +582,11 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         if (trackData == null || trackData.tiles == null) return;
 
         GameObject root = GetOrCreateTrackRoot(clearExisting: true);
-        Transform parent = root.transform;
-
+        int highestRow = 0;
         foreach (var tile in trackData.tiles)
         {
+            if (tile.row > highestRow) highestRow = tile.row;
+
             Vector3 pos = new Vector3(tile.col * COL_WIDTH, tile.y, tile.row * ROW_LEN);
             switch (tile.type)
             {
@@ -602,13 +603,21 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                     break;
                 case 4: // 寶石
                     CreateSingleTile(parent, tile.col, tile.row, tile.y);
-                    CreateGem(parent, new Vector3(pos.x, pos.y + 0.8f, pos.z));
+                    CreateGem(parent, new Vector3(pos.x, pos.y + 0.95f, pos.z));
                     break;
             }
         }
 
-        // 於最後一行放置終點星門
-        CreateFinishGate(parent, new Vector3(0, 1.5f, (trackData.totalRows + 2) * ROW_LEN));
+        // 終點星門動態放置在玩家最高建造行之後 3 排
+        int finishRow = Mathf.Max(highestRow + 3, 20);
+        CreateFinishGate(parent, new Vector3(0, 1.5f, finishRow * ROW_LEN));
+
+        RollingSkyGameManager gm = FindAnyObjectByType<RollingSkyGameManager>();
+        if (gm != null)
+        {
+            gm.trackLength = finishRow * ROW_LEN;
+            gm.ResetLevelStats();
+        }
     }
 
     // ==================== 幾何元件生成輔助 ====================
@@ -716,6 +725,6 @@ public class CustomTrackTile
 [System.Serializable]
 public class CustomTrackData
 {
-    public int totalRows = 60;
+    public int totalRows = 200;
     public List<CustomTrackTile> tiles = new List<CustomTrackTile>();
 }

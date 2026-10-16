@@ -11,9 +11,9 @@ public class TrackBuilderManager : MonoBehaviour
     [Header("Builder Status")]
     public bool isEditMode = true;
     public int cursorCol = 0; // -2 ~ 2
-    public int cursorRow = 0; // 0 ~ 59
+    public int cursorRow = 0; // 0 ~ 199
 
-    private const int MAX_ROWS = 60;
+    public const int MAX_ROWS = 200; // 擴充上限至 200 排 (400 米史詩賽道)，徹底突破 59 排限制
     private const float COL_WIDTH = 2.0f;
     private const float ROW_LEN = 2.0f;
 
@@ -102,15 +102,7 @@ public class TrackBuilderManager : MonoBehaviour
             if (camCtrl != null) camCtrl.enabled = false;
         }
 
-        // 預設填入前 5 排地磚作為起跑台
-        for (int r = 0; r < 5; r++)
-        {
-            for (int c = 0; c < 5; c++)
-            {
-                grid[c, r] = 1;
-            }
-        }
-
+        // 預設全空畫布，讓玩家從零自由建造，不強制預填任何方塊
         LoadSavedTrack();
         CreateVisualGrid();
         CreateCursor();
@@ -146,6 +138,7 @@ public class TrackBuilderManager : MonoBehaviour
 
     void HandleInput()
     {
+        // 左右橫移
         if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
         {
             cursorCol = Mathf.Clamp(cursorCol - 1, -2, 2);
@@ -154,13 +147,35 @@ public class TrackBuilderManager : MonoBehaviour
         {
             cursorCol = Mathf.Clamp(cursorCol + 1, -2, 2);
         }
+
+        // 前後位移：支援 Shift 加速前進 5 排，大幅提升 200 排賽道導航效率
+        int rowStep = (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) ? 5 : 1;
+
         if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W))
         {
-            cursorRow = Mathf.Clamp(cursorRow + 1, 0, MAX_ROWS - 1);
+            cursorRow = Mathf.Clamp(cursorRow + rowStep, 0, MAX_ROWS - 1);
         }
         if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S))
         {
             cursorRow = Mathf.Clamp(cursorRow - 1, 0, MAX_ROWS - 1);
+        }
+
+        // 翻頁快速導航 (PageUp / PageDown 跳躍 15 排，Home / End 首末直達)
+        if (Input.GetKeyDown(KeyCode.PageUp))
+        {
+            cursorRow = Mathf.Clamp(cursorRow + 15, 0, MAX_ROWS - 1);
+        }
+        if (Input.GetKeyDown(KeyCode.PageDown))
+        {
+            cursorRow = Mathf.Clamp(cursorRow - 15, 0, MAX_ROWS - 1);
+        }
+        if (Input.GetKeyDown(KeyCode.Home))
+        {
+            cursorRow = 0;
+        }
+        if (Input.GetKeyDown(KeyCode.End))
+        {
+            cursorRow = MAX_ROWS - 1;
         }
 
         // 快捷鍵放置物件
@@ -350,15 +365,41 @@ public class TrackBuilderManager : MonoBehaviour
 
     public void StartTestPlay()
     {
+        // 檢查賽道是否具備至少一塊地磚
+        int firstRow = -1;
+        int firstCol = 0;
+        for (int r = 0; r < MAX_ROWS; r++)
+        {
+            for (int c = 0; c < 5; c++)
+            {
+                if (grid[c, r] > 0)
+                {
+                    firstRow = r;
+                    firstCol = c - 2;
+                    break;
+                }
+            }
+            if (firstRow >= 0) break;
+        }
+
+        if (firstRow == -1)
+        {
+            if (infoText != null)
+            {
+                infoText.text = "<color=yellow>【無法試玩】賽道目前沒有任何方塊！請先使用按鍵 [1~4] 放置起跑方塊後再進行測試！</color>";
+            }
+            return;
+        }
+
         SaveTrack();
         isEditMode = false;
         if (cursorVisual != null) cursorVisual.SetActive(false);
         if (builderUIPanel != null) builderUIPanel.SetActive(false);
 
-        // 生成測試小球
+        // 生成測試小球，精準降落在第一塊方塊上方
         GameObject bObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         bObj.name = "TestBall";
-        bObj.transform.position = new Vector3(0, 1.0f, 2.0f);
+        bObj.transform.position = new Vector3(firstCol * COL_WIDTH, 1.2f, firstRow * ROW_LEN);
         bObj.AddComponent<Rigidbody>();
         testBall = bObj.AddComponent<RollingSkyBallController>();
 
@@ -485,11 +526,15 @@ public class TrackBuilderManager : MonoBehaviour
         {
             for (int c = 0; c < 5; c++)
             {
-                grid[c, r] = (r < 5) ? 1 : 0;
+                grid[c, r] = 0;
             }
         }
         CreateVisualGrid();
         SaveTrack();
+        if (infoText != null)
+        {
+            infoText.text = "<color=yellow>【賽道已完全清空】地圖已歸零重置，請自由從零開始建造！</color>";
+        }
     }
 
     void ReturnToMenu()
@@ -510,7 +555,7 @@ public class TrackBuilderManager : MonoBehaviour
         if (currentType == 3) typeName = "尖刺陷阱 (Hazard)";
         if (currentType == 4) typeName = "水晶寶石 (Gem)";
 
-        infoText.text = $"【自訂場地編輯器】 游標座標: (欄 {cursorCol}, 排 {cursorRow}) | 當前物件: <color=yellow>{typeName}</color>\n" +
-                        "按鍵提示: [WASD/方向鍵] 移動游標 | [1] 地磚 | [2] 彈跳墊 | [3] 尖刺 | [4] 寶石 | [0] 消除";
+        infoText.text = $"【自訂場地編輯器】 游標座標: (欄 {cursorCol}, 排 {cursorRow} / {MAX_ROWS - 1}) | 當前物件: <color=yellow>{typeName}</color>\n" +
+                        "按鍵提示: [WASD/方向鍵] 移動游標 (Shift加速5排 / PgUp/PgDn加速15排 / Home·End首末) | [1] 地磚 | [2] 彈跳墊 | [3] 尖刺 | [4] 寶石 | [0] 消除";
     }
 }
