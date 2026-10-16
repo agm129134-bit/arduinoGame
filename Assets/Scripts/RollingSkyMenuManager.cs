@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -13,12 +14,27 @@ public class RollingSkyMenuManager : MonoBehaviour
     public GameObject shopPanel;
 
     [Header("Settings Sub-Tabs")]
+    public GameObject displaySettingsPanel;
     public GameObject keyboardSettingsPanel;
     public GameObject controllerSettingsPanel;
     public GameObject audioSettingsPanel;
+    public Button tabDisplayBtn;
     public Button tabKeyboardBtn;
     public Button tabControllerBtn;
     public Button tabAudioBtn;
+
+    [Header("Display Settings UI")]
+    public Button btnFullscreen;
+    public Button btnWindowed;
+    public Button btnResPrev;
+    public Button btnResNext;
+    public Text txtCurrentRes;
+    public Button btnApplyRes;
+    public Text txtDisplayStatus;
+    public Button btnRes1080;
+    public Button btnRes900;
+    public Button btnRes768;
+    public Button btnRes720;
 
     [Header("Keyboard Settings UI")]
     public Button btnKeyLeft;
@@ -66,6 +82,19 @@ public class RollingSkyMenuManager : MonoBehaviour
     private KeyCode currentKeyJump = KeyCode.Space;
     private int currentBgmIndex = 0;
 
+    [System.Serializable]
+    public struct ResolutionOption
+    {
+        public int width;
+        public int height;
+        public ResolutionOption(int w, int h) { width = w; height = h; }
+    }
+    private List<ResolutionOption> resOptions = new List<ResolutionOption>();
+    private int currentResIndex = 0;
+    private int selectedWidth = 1920;
+    private int selectedHeight = 1080;
+    private bool isFullscreen = true;
+
     void Awake()
     {
         if (arduino == null) arduino = FindAnyObjectByType<ArduinoReceiver>();
@@ -88,8 +117,11 @@ public class RollingSkyMenuManager : MonoBehaviour
             audioObj.AddComponent<AudioManager>();
         }
 
-        // Runtime UI 自癒補強：排版修復、10關網格、外觀商店
-        EnsureAudioSettingsUI();
+        // 初始化解析度與全螢幕設定
+        InitResolutionList();
+
+        // Runtime UI 自癒補強：畫面與音訊設定分頁、排版修復、10關網格、外觀商店
+        EnsureSettingsPanelsAndTabsUI();
         EnsureLevelSelect10Grid();
         EnsureMainMenuExtendedButtons();
         EnsureShopUI();
@@ -104,6 +136,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
         if (levelSelectPanel != null) levelSelectPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (displaySettingsPanel != null) displaySettingsPanel.SetActive(false);
         if (shopPanel != null) shopPanel.SetActive(false);
         currentActivePanel = mainMenuPanel;
 
@@ -165,27 +198,98 @@ public class RollingSkyMenuManager : MonoBehaviour
             BindButton(levelSelectPanel, "Btn_Back", () => ShowPanel(mainMenuPanel));
         }
 
-        // 設定面板 Tab 切換
+        // 設定面板 Tab 切換 (0: 畫面, 1: 鍵盤, 2: 控制器, 3: 音訊)
+        if (tabDisplayBtn != null)
+        {
+            tabDisplayBtn.onClick.RemoveAllListeners();
+            tabDisplayBtn.onClick.AddListener(() => SwitchSettingsTab(0));
+        }
+        else BindButton(settingsPanel, "Btn_TabDisplay", () => SwitchSettingsTab(0));
+
         if (tabKeyboardBtn != null)
         {
             tabKeyboardBtn.onClick.RemoveAllListeners();
-            tabKeyboardBtn.onClick.AddListener(() => SwitchSettingsTab(0));
+            tabKeyboardBtn.onClick.AddListener(() => SwitchSettingsTab(1));
         }
-        else BindButton(settingsPanel, "Btn_TabKeyboard", () => SwitchSettingsTab(0));
+        else BindButton(settingsPanel, "Btn_TabKeyboard", () => SwitchSettingsTab(1));
 
         if (tabControllerBtn != null)
         {
             tabControllerBtn.onClick.RemoveAllListeners();
-            tabControllerBtn.onClick.AddListener(() => SwitchSettingsTab(1));
+            tabControllerBtn.onClick.AddListener(() => SwitchSettingsTab(2));
         }
-        else BindButton(settingsPanel, "Btn_TabController", () => SwitchSettingsTab(1));
+        else BindButton(settingsPanel, "Btn_TabController", () => SwitchSettingsTab(2));
 
         if (tabAudioBtn != null)
         {
             tabAudioBtn.onClick.RemoveAllListeners();
-            tabAudioBtn.onClick.AddListener(() => SwitchSettingsTab(2));
+            tabAudioBtn.onClick.AddListener(() => SwitchSettingsTab(3));
         }
-        else BindButton(settingsPanel, "Btn_TabAudio", () => SwitchSettingsTab(2));
+        else BindButton(settingsPanel, "Btn_TabAudio", () => SwitchSettingsTab(3));
+
+        // 畫面與顯示設定按鈕綁定
+        if (btnFullscreen != null)
+        {
+            btnFullscreen.onClick.RemoveAllListeners();
+            btnFullscreen.onClick.AddListener(() => SetFullscreen(true));
+        }
+        else BindButton(displaySettingsPanel, "Btn_Fullscreen", () => SetFullscreen(true));
+
+        if (btnWindowed != null)
+        {
+            btnWindowed.onClick.RemoveAllListeners();
+            btnWindowed.onClick.AddListener(() => SetFullscreen(false));
+        }
+        else BindButton(displaySettingsPanel, "Btn_Windowed", () => SetFullscreen(false));
+
+        if (btnResPrev != null)
+        {
+            btnResPrev.onClick.RemoveAllListeners();
+            btnResPrev.onClick.AddListener(OnResPrevClicked);
+        }
+        else BindButton(displaySettingsPanel, "Btn_ResPrev", OnResPrevClicked);
+
+        if (btnResNext != null)
+        {
+            btnResNext.onClick.RemoveAllListeners();
+            btnResNext.onClick.AddListener(OnResNextClicked);
+        }
+        else BindButton(displaySettingsPanel, "Btn_ResNext", OnResNextClicked);
+
+        if (btnRes1080 != null)
+        {
+            btnRes1080.onClick.RemoveAllListeners();
+            btnRes1080.onClick.AddListener(() => OnPresetClicked(1920, 1080));
+        }
+        else BindButton(displaySettingsPanel, "Btn_Res1080", () => OnPresetClicked(1920, 1080));
+
+        if (btnRes900 != null)
+        {
+            btnRes900.onClick.RemoveAllListeners();
+            btnRes900.onClick.AddListener(() => OnPresetClicked(1600, 900));
+        }
+        else BindButton(displaySettingsPanel, "Btn_Res900", () => OnPresetClicked(1600, 900));
+
+        if (btnRes768 != null)
+        {
+            btnRes768.onClick.RemoveAllListeners();
+            btnRes768.onClick.AddListener(() => OnPresetClicked(1366, 768));
+        }
+        else BindButton(displaySettingsPanel, "Btn_Res768", () => OnPresetClicked(1366, 768));
+
+        if (btnRes720 != null)
+        {
+            btnRes720.onClick.RemoveAllListeners();
+            btnRes720.onClick.AddListener(() => OnPresetClicked(1280, 720));
+        }
+        else BindButton(displaySettingsPanel, "Btn_Res720", () => OnPresetClicked(1280, 720));
+
+        if (btnApplyRes != null)
+        {
+            btnApplyRes.onClick.RemoveAllListeners();
+            btnApplyRes.onClick.AddListener(ApplyCurrentResolution);
+        }
+        else BindButton(displaySettingsPanel, "Btn_ApplyRes", ApplyCurrentResolution);
 
         // 鍵盤重新綁定按鈕
         if (btnKeyLeft != null)
@@ -564,51 +668,65 @@ public class RollingSkyMenuManager : MonoBehaviour
         }
     }
 
-    // ==================== 設定面板排版修復 (解決兩行折行問題) ====================
-    void EnsureAudioSettingsUI()
+    // ==================== 設定面板排版與動態分頁生成 ====================
+    void EnsureSettingsPanelsAndTabsUI()
     {
         if (settingsPanel == null) return;
 
         Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         if (defaultFont == null) defaultFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-        // 1. 頂部分頁按鈕：寬度放寬至 340，字體微調為 22，設定 Overflow 徹底避免換行！
+        // 1. 頂部 4 大分頁按鈕：寬度 260，間距 20，水平對稱，字體 21，開啟 Overflow 徹底避免折行！
+        Transform tTabDisplay = settingsPanel.transform.Find("Btn_TabDisplay");
         Transform tTabKey = settingsPanel.transform.Find("Btn_TabKeyboard");
         Transform tTabCtrl = settingsPanel.transform.Find("Btn_TabController");
         Transform tTabAudio = settingsPanel.transform.Find("Btn_TabAudio");
 
+        if (tTabDisplay == null)
+        {
+            tabDisplayBtn = CreateStyledButton(settingsPanel.transform, "Btn_TabDisplay", "【 畫面設定 DISPLAY 】", new Vector2(-420, 310), new Vector2(260, 60), 21, defaultFont);
+        }
+        else
+        {
+            RectTransform rt = tTabDisplay.GetComponent<RectTransform>();
+            rt.anchoredPosition = new Vector2(-420, 310);
+            rt.sizeDelta = new Vector2(260, 60);
+            Text txt = tTabDisplay.GetComponentInChildren<Text>();
+            if (txt != null) { txt.text = "【 畫面設定 DISPLAY 】"; txt.fontSize = 21; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
+            tabDisplayBtn = tTabDisplay.GetComponent<Button>();
+        }
+
         if (tTabKey != null)
         {
             RectTransform rtKey = tTabKey.GetComponent<RectTransform>();
-            rtKey.anchoredPosition = new Vector2(-360, 310);
-            rtKey.sizeDelta = new Vector2(340, 60);
+            rtKey.anchoredPosition = new Vector2(-140, 310);
+            rtKey.sizeDelta = new Vector2(260, 60);
             Text txt = tTabKey.GetComponentInChildren<Text>();
-            if (txt != null) { txt.text = "【 鍵盤 KEYBOARD 】"; txt.fontSize = 22; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
+            if (txt != null) { txt.text = "【 鍵盤 KEYBOARD 】"; txt.fontSize = 21; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
             tabKeyboardBtn = tTabKey.GetComponent<Button>();
         }
 
         if (tTabCtrl != null)
         {
             RectTransform rtCtrl = tTabCtrl.GetComponent<RectTransform>();
-            rtCtrl.anchoredPosition = new Vector2(0, 310);
-            rtCtrl.sizeDelta = new Vector2(340, 60);
+            rtCtrl.anchoredPosition = new Vector2(140, 310);
+            rtCtrl.sizeDelta = new Vector2(260, 60);
             Text txt = tTabCtrl.GetComponentInChildren<Text>();
-            if (txt != null) { txt.text = "【 控制器 CONTROLLER 】"; txt.fontSize = 22; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
+            if (txt != null) { txt.text = "【 控制器 CONTROLLER 】"; txt.fontSize = 21; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
             tabControllerBtn = tTabCtrl.GetComponent<Button>();
         }
 
         if (tTabAudio == null)
         {
-            Button btnAudio = CreateStyledButton(settingsPanel.transform, "Btn_TabAudio", "【 音訊設定 AUDIO 】", new Vector2(360, 310), new Vector2(340, 60), 22, defaultFont);
-            tabAudioBtn = btnAudio;
+            tabAudioBtn = CreateStyledButton(settingsPanel.transform, "Btn_TabAudio", "【 音訊設定 AUDIO 】", new Vector2(420, 310), new Vector2(260, 60), 21, defaultFont);
         }
         else
         {
             RectTransform rtAudio = tTabAudio.GetComponent<RectTransform>();
-            rtAudio.anchoredPosition = new Vector2(360, 310);
-            rtAudio.sizeDelta = new Vector2(340, 60);
+            rtAudio.anchoredPosition = new Vector2(420, 310);
+            rtAudio.sizeDelta = new Vector2(260, 60);
             Text txt = tTabAudio.GetComponentInChildren<Text>();
-            if (txt != null) { txt.text = "【 音訊設定 AUDIO 】"; txt.fontSize = 22; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
+            if (txt != null) { txt.text = "【 音訊設定 AUDIO 】"; txt.fontSize = 21; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
             tabAudioBtn = tTabAudio.GetComponent<Button>();
         }
 
@@ -654,7 +772,19 @@ public class RollingSkyMenuManager : MonoBehaviour
             if (txt != null) { txt.text = "儲存並返回 (SAVE & BACK)"; txt.fontSize = 20; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
         }
 
-        // 3. 確保 AudioSettingsPanel 存在
+        // 3. 確保 DisplaySettingsPanel 存在
+        Transform tDisplayPanel = settingsPanel.transform.Find("DisplaySettingsPanel");
+        if (tDisplayPanel == null)
+        {
+            displaySettingsPanel = BuildDynamicDisplaySettingsPanel(settingsPanel.transform, defaultFont);
+        }
+        else
+        {
+            displaySettingsPanel = tDisplayPanel.gameObject;
+            HookDisplayUIReferences(displaySettingsPanel);
+        }
+
+        // 4. 確保 AudioSettingsPanel 存在
         Transform tAudioPanel = settingsPanel.transform.Find("AudioSettingsPanel");
         if (tAudioPanel == null)
         {
@@ -665,6 +795,86 @@ public class RollingSkyMenuManager : MonoBehaviour
             audioSettingsPanel = tAudioPanel.gameObject;
             HookAudioUIReferences(audioSettingsPanel);
         }
+    }
+
+    void EnsureAudioSettingsUI()
+    {
+        EnsureSettingsPanelsAndTabsUI();
+    }
+
+    GameObject BuildDynamicDisplaySettingsPanel(Transform parent, Font font)
+    {
+        GameObject pDisplay = new GameObject("DisplaySettingsPanel");
+        pDisplay.transform.SetParent(parent, false);
+        Image img = pDisplay.AddComponent<Image>();
+        img.color = Color.clear;
+        img.raycastTarget = false;
+
+        RectTransform rt = pDisplay.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.sizeDelta = Vector2.zero;
+
+        // 1. 全螢幕與視窗化開關
+        CreateText(pDisplay.transform, "Lbl_ScreenMode", "顯示模式 (SCREEN MODE):", 26, Color.white, new Vector2(0, 205), new Vector2(800, 40), font, FontStyle.Bold);
+        btnFullscreen = CreateStyledButton(pDisplay.transform, "Btn_Fullscreen", "🖥️ 全螢幕模式 (FULLSCREEN)", new Vector2(-170, 145), new Vector2(320, 60), 22, font);
+        btnWindowed = CreateStyledButton(pDisplay.transform, "Btn_Windowed", "🪟 視窗化模式 (WINDOWED)", new Vector2(170, 145), new Vector2(320, 60), 22, font);
+
+        // 2. 解析度選擇器
+        CreateText(pDisplay.transform, "Lbl_Resolution", "螢幕解析度 (RESOLUTION):", 26, Color.white, new Vector2(0, 65), new Vector2(800, 40), font, FontStyle.Bold);
+        btnResPrev = CreateStyledButton(pDisplay.transform, "Btn_ResPrev", "◀ 上一個", new Vector2(-240, 5), new Vector2(150, 55), 22, font);
+        txtCurrentRes = CreateText(pDisplay.transform, "Txt_CurrentRes", "1920 × 1080", 28, Color.cyan, new Vector2(0, 5), new Vector2(300, 55), font, FontStyle.Bold);
+        btnResNext = CreateStyledButton(pDisplay.transform, "Btn_ResNext", "下一個 ▶", new Vector2(240, 5), new Vector2(150, 55), 22, font);
+
+        // 3. 推薦解析度快速按鈕
+        btnRes1080 = CreateStyledButton(pDisplay.transform, "Btn_Res1080", "1920 × 1080", new Vector2(-315, -70), new Vector2(190, 50), 20, font);
+        btnRes900 = CreateStyledButton(pDisplay.transform, "Btn_Res900", "1600 × 900", new Vector2(-105, -70), new Vector2(190, 50), 20, font);
+        btnRes768 = CreateStyledButton(pDisplay.transform, "Btn_Res768", "1366 × 768", new Vector2(105, -70), new Vector2(190, 50), 20, font);
+        btnRes720 = CreateStyledButton(pDisplay.transform, "Btn_Res720", "1280 × 720", new Vector2(315, -70), new Vector2(190, 50), 20, font);
+
+        // 4. 立即套用按鈕
+        btnApplyRes = CreateStyledButton(pDisplay.transform, "Btn_ApplyRes", "✔ 套用解析度設定 (APPLY RESOLUTION)", new Vector2(0, -145), new Vector2(400, 55), 22, font);
+        ColorBlock cb = btnApplyRes.colors;
+        cb.normalColor = new Color(0.1f, 0.45f, 0.35f);
+        cb.highlightedColor = new Color(0.15f, 0.65f, 0.5f);
+        cb.pressedColor = new Color(0.08f, 0.3f, 0.22f);
+        btnApplyRes.colors = cb;
+
+        // 5. 當前狀態顯示文字
+        txtDisplayStatus = CreateText(pDisplay.transform, "Txt_DisplayStatus", "", 22, Color.yellow, new Vector2(0, -220), new Vector2(900, 40), font, FontStyle.Normal);
+
+        pDisplay.SetActive(false);
+        return pDisplay;
+    }
+
+    void HookDisplayUIReferences(GameObject panel)
+    {
+        if (panel == null) return;
+        Transform tf = panel.transform.Find("Btn_Fullscreen");
+        if (tf != null) btnFullscreen = tf.GetComponent<Button>();
+        Transform tw = panel.transform.Find("Btn_Windowed");
+        if (tw != null) btnWindowed = tw.GetComponent<Button>();
+
+        Transform tp = panel.transform.Find("Btn_ResPrev");
+        if (tp != null) btnResPrev = tp.GetComponent<Button>();
+        Transform tn = panel.transform.Find("Btn_ResNext");
+        if (tn != null) btnResNext = tn.GetComponent<Button>();
+
+        Transform tc = panel.transform.Find("Txt_CurrentRes");
+        if (tc != null) txtCurrentRes = tc.GetComponent<Text>();
+
+        Transform ta = panel.transform.Find("Btn_ApplyRes");
+        if (ta != null) btnApplyRes = ta.GetComponent<Button>();
+
+        Transform ts = panel.transform.Find("Txt_DisplayStatus");
+        if (ts != null) txtDisplayStatus = ts.GetComponent<Text>();
+
+        Transform t1080 = panel.transform.Find("Btn_Res1080");
+        if (t1080 != null) btnRes1080 = t1080.GetComponent<Button>();
+        Transform t900 = panel.transform.Find("Btn_Res900");
+        if (t900 != null) btnRes900 = t900.GetComponent<Button>();
+        Transform t768 = panel.transform.Find("Btn_Res768");
+        if (t768 != null) btnRes768 = t768.GetComponent<Button>();
+        Transform t720 = panel.transform.Find("Btn_Res720");
+        if (t720 != null) btnRes720 = t720.GetComponent<Button>();
     }
 
     GameObject BuildDynamicAudioSettingsPanel(Transform parent, Font font)
@@ -810,32 +1020,22 @@ public class RollingSkyMenuManager : MonoBehaviour
     public void SwitchSettingsTab(int tabIndex)
     {
         ClearEventFocus();
-        if (keyboardSettingsPanel != null) keyboardSettingsPanel.SetActive(tabIndex == 0);
-        if (controllerSettingsPanel != null) controllerSettingsPanel.SetActive(tabIndex == 1);
-        if (audioSettingsPanel != null) audioSettingsPanel.SetActive(tabIndex == 2);
+        if (displaySettingsPanel != null) displaySettingsPanel.SetActive(tabIndex == 0);
+        if (keyboardSettingsPanel != null) keyboardSettingsPanel.SetActive(tabIndex == 1);
+        if (controllerSettingsPanel != null) controllerSettingsPanel.SetActive(tabIndex == 2);
+        if (audioSettingsPanel != null) audioSettingsPanel.SetActive(tabIndex == 3);
 
         Color activeCol = new Color(0f, 0.5f, 0.9f);
         Color normalCol = new Color(0.1f, 0.22f, 0.38f);
 
-        if (tabKeyboardBtn != null)
-        {
-            ColorBlock cb = tabKeyboardBtn.colors;
-            cb.normalColor = (tabIndex == 0) ? activeCol : normalCol;
-            tabKeyboardBtn.colors = cb;
-        }
+        if (tabDisplayBtn != null) SetBtnNormalColor(tabDisplayBtn, (tabIndex == 0) ? activeCol : normalCol);
+        if (tabKeyboardBtn != null) SetBtnNormalColor(tabKeyboardBtn, (tabIndex == 1) ? activeCol : normalCol);
+        if (tabControllerBtn != null) SetBtnNormalColor(tabControllerBtn, (tabIndex == 2) ? activeCol : normalCol);
+        if (tabAudioBtn != null) SetBtnNormalColor(tabAudioBtn, (tabIndex == 3) ? activeCol : normalCol);
 
-        if (tabControllerBtn != null)
+        if (tabIndex == 0)
         {
-            ColorBlock cb = tabControllerBtn.colors;
-            cb.normalColor = (tabIndex == 1) ? activeCol : normalCol;
-            tabControllerBtn.colors = cb;
-        }
-
-        if (tabAudioBtn != null)
-        {
-            ColorBlock cb = tabAudioBtn.colors;
-            cb.normalColor = (tabIndex == 2) ? activeCol : normalCol;
-            tabAudioBtn.colors = cb;
+            UpdateDisplayUI();
         }
     }
 
@@ -944,6 +1144,9 @@ public class RollingSkyMenuManager : MonoBehaviour
     {
         ClearEventFocus();
 
+        // 儲存畫面設定
+        ApplyCurrentResolution();
+
         PlayerPrefs.SetInt("Key_Left", (int)currentKeyLeft);
         PlayerPrefs.SetInt("Key_Right", (int)currentKeyRight);
         PlayerPrefs.SetInt("Key_Jump", (int)currentKeyJump);
@@ -971,6 +1174,14 @@ public class RollingSkyMenuManager : MonoBehaviour
     {
         ClearEventFocus();
 
+        // 1. 重設畫面為原生解析度全螢幕
+        selectedWidth = (Screen.currentResolution.width > 0) ? Screen.currentResolution.width : 1920;
+        selectedHeight = (Screen.currentResolution.height > 0) ? Screen.currentResolution.height : 1080;
+        isFullscreen = true;
+        currentResIndex = resOptions.FindIndex(o => o.width == selectedWidth && o.height == selectedHeight);
+        ApplyCurrentResolution();
+
+        // 2. 控制預設
         currentKeyLeft = KeyCode.A;
         currentKeyRight = KeyCode.D;
         currentKeyJump = KeyCode.Space;
@@ -982,6 +1193,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         if (sliderTiltDeadzone != null) sliderTiltDeadzone.value = 0.08f;
         if (sliderJumpDistance != null) sliderJumpDistance.value = 20.0f;
 
+        // 3. 音效預設
         currentBgmIndex = 0;
         if (sliderBgmVolume != null) sliderBgmVolume.value = 0.7f;
         if (sliderSfxVolume != null) sliderSfxVolume.value = 0.8f;
@@ -1037,6 +1249,13 @@ public class RollingSkyMenuManager : MonoBehaviour
 
     void LoadAllSettings()
     {
+        // 載入畫面顯示設定
+        selectedWidth = PlayerPrefs.GetInt("Screen_Width", Screen.currentResolution.width > 0 ? Screen.currentResolution.width : 1920);
+        selectedHeight = PlayerPrefs.GetInt("Screen_Height", Screen.currentResolution.height > 0 ? Screen.currentResolution.height : 1080);
+        isFullscreen = PlayerPrefs.GetInt("Screen_Fullscreen", 1) == 1;
+        currentResIndex = resOptions.FindIndex(o => o.width == selectedWidth && o.height == selectedHeight);
+        UpdateDisplayUI();
+
         currentKeyLeft = (KeyCode)PlayerPrefs.GetInt("Key_Left", (int)KeyCode.A);
         currentKeyRight = (KeyCode)PlayerPrefs.GetInt("Key_Right", (int)KeyCode.D);
         currentKeyJump = (KeyCode)PlayerPrefs.GetInt("Key_Jump", (int)KeyCode.Space);
@@ -1080,6 +1299,164 @@ public class RollingSkyMenuManager : MonoBehaviour
             if (txtSfxVolume != null) txtSfxVolume.text = $"{sliderSfxVolume.value * 100f:F0}%";
         }
         UpdateBgmUI();
+    }
+
+    // ==================== 畫面顯示控制邏輯 ====================
+    void InitResolutionList()
+    {
+        resOptions.Clear();
+
+        if (Screen.resolutions != null && Screen.resolutions.Length > 0)
+        {
+            foreach (var r in Screen.resolutions)
+            {
+                if (r.width >= 1024 && r.height >= 600)
+                {
+                    if (!resOptions.Exists(o => o.width == r.width && o.height == r.height))
+                    {
+                        resOptions.Add(new ResolutionOption(r.width, r.height));
+                    }
+                }
+            }
+        }
+
+        int[,] standard = new int[,] {
+            { 1280, 720 },
+            { 1366, 768 },
+            { 1600, 900 },
+            { 1920, 1080 },
+            { 2560, 1440 },
+            { 3840, 2160 }
+        };
+        for (int i = 0; i < standard.GetLength(0); i++)
+        {
+            int w = standard[i, 0];
+            int h = standard[i, 1];
+            if (!resOptions.Exists(o => o.width == w && o.height == h))
+            {
+                resOptions.Add(new ResolutionOption(w, h));
+            }
+        }
+
+        resOptions.Sort((a, b) => {
+            int cmp = a.width.CompareTo(b.width);
+            return cmp != 0 ? cmp : a.height.CompareTo(b.height);
+        });
+
+        selectedWidth = PlayerPrefs.GetInt("Screen_Width", Screen.currentResolution.width > 0 ? Screen.currentResolution.width : 1920);
+        selectedHeight = PlayerPrefs.GetInt("Screen_Height", Screen.currentResolution.height > 0 ? Screen.currentResolution.height : 1080);
+        isFullscreen = PlayerPrefs.GetInt("Screen_Fullscreen", 1) == 1;
+
+        currentResIndex = resOptions.FindIndex(o => o.width == selectedWidth && o.height == selectedHeight);
+        if (currentResIndex < 0)
+        {
+            resOptions.Add(new ResolutionOption(selectedWidth, selectedHeight));
+            resOptions.Sort((a, b) => a.width.CompareTo(b.width));
+            currentResIndex = resOptions.FindIndex(o => o.width == selectedWidth && o.height == selectedHeight);
+        }
+    }
+
+    public void SetFullscreen(bool fullscreen)
+    {
+        isFullscreen = fullscreen;
+        Screen.SetResolution(selectedWidth, selectedHeight, isFullscreen ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed);
+        PlayerPrefs.SetInt("Screen_Fullscreen", isFullscreen ? 1 : 0);
+        PlayerPrefs.Save();
+        UpdateDisplayUI();
+        Debug.Log($"🖥️ [Display] 切換顯示模式: {(isFullscreen ? "全螢幕 (FULLSCREEN)" : "視窗化 (WINDOWED)")}");
+    }
+
+    void OnResPrevClicked()
+    {
+        if (resOptions.Count == 0) return;
+        currentResIndex--;
+        if (currentResIndex < 0) currentResIndex = resOptions.Count - 1;
+        selectedWidth = resOptions[currentResIndex].width;
+        selectedHeight = resOptions[currentResIndex].height;
+        UpdateResolutionText();
+        UpdateDisplayUI();
+    }
+
+    void OnResNextClicked()
+    {
+        if (resOptions.Count == 0) return;
+        currentResIndex++;
+        if (currentResIndex >= resOptions.Count) currentResIndex = 0;
+        selectedWidth = resOptions[currentResIndex].width;
+        selectedHeight = resOptions[currentResIndex].height;
+        UpdateResolutionText();
+        UpdateDisplayUI();
+    }
+
+    void OnPresetClicked(int w, int h)
+    {
+        selectedWidth = w;
+        selectedHeight = h;
+        currentResIndex = resOptions.FindIndex(o => o.width == w && o.height == h);
+        ApplyCurrentResolution();
+    }
+
+    public void ApplyCurrentResolution()
+    {
+        Screen.SetResolution(selectedWidth, selectedHeight, isFullscreen ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed);
+        PlayerPrefs.SetInt("Screen_Width", selectedWidth);
+        PlayerPrefs.SetInt("Screen_Height", selectedHeight);
+        PlayerPrefs.SetInt("Screen_Fullscreen", isFullscreen ? 1 : 0);
+        PlayerPrefs.Save();
+        UpdateDisplayUI();
+        Debug.Log($"🖥️ [Display] 已套用解析度: {selectedWidth} × {selectedHeight}, 模式: {(isFullscreen ? "全螢幕" : "視窗化")}");
+    }
+
+    void UpdateDisplayUI()
+    {
+        UpdateResolutionText();
+
+        Color activeCol = new Color(0f, 0.65f, 1f);
+        Color normalCol = new Color(0.1f, 0.22f, 0.38f);
+
+        if (btnFullscreen != null) SetBtnNormalColor(btnFullscreen, isFullscreen ? activeCol : normalCol);
+        if (btnWindowed != null) SetBtnNormalColor(btnWindowed, !isFullscreen ? activeCol : normalCol);
+
+        HighlightPresetBtn(btnRes1080, 1920, 1080);
+        HighlightPresetBtn(btnRes900, 1600, 900);
+        HighlightPresetBtn(btnRes768, 1366, 768);
+        HighlightPresetBtn(btnRes720, 1280, 720);
+
+        if (txtDisplayStatus != null)
+        {
+            string modeStr = isFullscreen ? "全螢幕 (FULLSCREEN)" : "視窗化 (WINDOWED)";
+            txtDisplayStatus.text = $"★ 生效解析度: <color=cyan>{Screen.width} × {Screen.height}</color>  |  模式: <color=yellow>{modeStr}</color>";
+        }
+    }
+
+    void HighlightPresetBtn(Button btn, int w, int h)
+    {
+        if (btn == null) return;
+        bool isMatch = (selectedWidth == w && selectedHeight == h);
+        SetBtnNormalColor(btn, isMatch ? new Color(0f, 0.65f, 1f) : new Color(0.1f, 0.22f, 0.38f));
+    }
+
+    void UpdateResolutionText()
+    {
+        if (txtCurrentRes != null)
+        {
+            txtCurrentRes.text = $"{selectedWidth} × {selectedHeight}";
+        }
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    public static void ApplySavedScreenSettingsOnBoot()
+    {
+        if (PlayerPrefs.HasKey("Screen_Width") && PlayerPrefs.HasKey("Screen_Height"))
+        {
+            int w = PlayerPrefs.GetInt("Screen_Width", 1920);
+            int h = PlayerPrefs.GetInt("Screen_Height", 1080);
+            bool fs = PlayerPrefs.GetInt("Screen_Fullscreen", 1) == 1;
+            if (w > 0 && h > 0)
+            {
+                Screen.SetResolution(w, h, fs ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed);
+            }
+        }
     }
 
     void UpdateHardwareReadout()
