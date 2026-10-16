@@ -83,10 +83,12 @@ public class TrackBuilderManager : MonoBehaviour
         if (matGem == null)
         {
             matGem = new Material(Shader.Find("Standard"));
-            matGem.color = new Color(0.2f, 0.95f, 1f, 0.9f);
-            matGem.SetColor("_EmissionColor", new Color(0.3f, 1.2f, 1.5f));
+            matGem.name = "Mat_Gem_RadiantGold";
+            matGem.color = new Color(1.0f, 0.88f, 0.12f, 1.0f);
+            matGem.SetColor("_EmissionColor", new Color(3.2f, 2.5f, 0.4f));
             matGem.EnableKeyword("_EMISSION");
-            matGem.SetFloat("_Glossiness", 0.95f);
+            matGem.SetFloat("_Metallic", 0.7f);
+            matGem.SetFloat("_Glossiness", 0.98f);
         }
     }
 
@@ -283,11 +285,11 @@ public class TrackBuilderManager : MonoBehaviour
                 haz.AddComponent<Hazard>();
                 break;
 
-            case 4: // 水晶寶石 (璀璨旋轉鑽石模型)
+            case 4: // 水晶寶石 (璀璨高亮旋轉金鑽模型)
                 GameObject gem = new GameObject("Gem");
                 gem.transform.SetParent(cellObj.transform);
-                gem.transform.position = new Vector3(pos.x, 0.85f, pos.z);
-                gem.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
+                gem.transform.position = new Vector3(pos.x, 0.95f, pos.z);
+                gem.transform.localScale = new Vector3(0.9f, 0.9f, 0.9f);
                 SphereCollider gsc = gem.AddComponent<SphereCollider>();
                 gsc.isTrigger = true;
                 gsc.radius = 0.6f;

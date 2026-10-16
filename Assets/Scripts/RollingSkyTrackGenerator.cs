@@ -104,7 +104,16 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         if (matTileCyan == null) matTileCyan = CreateFallbackMat(new Color(0f, 0.75f, 1f));
         if (matHazard == null) matHazard = CreateFallbackMat(new Color(1f, 0.15f, 0.15f));
         if (matJumpPad == null) matJumpPad = CreateFallbackMat(new Color(0.1f, 1f, 0.4f));
-        if (matGem == null) matGem = CreateFallbackMat(new Color(0.2f, 0.95f, 1f));
+        if (matGem == null)
+        {
+            matGem = new Material(Shader.Find("Standard"));
+            matGem.name = "Mat_Gem_RadiantGold";
+            matGem.color = new Color(1.0f, 0.88f, 0.12f, 1.0f);
+            matGem.SetColor("_EmissionColor", new Color(3.2f, 2.5f, 0.4f));
+            matGem.EnableKeyword("_EMISSION");
+            matGem.SetFloat("_Metallic", 0.7f);
+            matGem.SetFloat("_Glossiness", 0.98f);
+        }
         if (matGoal == null) matGoal = CreateFallbackMat(new Color(1f, 0.85f, 0.1f));
     }
 
@@ -421,97 +430,135 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         chunk.transform.SetParent(root.transform);
 
         int startRow = Mathf.RoundToInt(chunkStartZ / ROW_LEN);
-        int chunkType = Random.Range(0, 6);
+        int chunkType = Random.Range(0, 10);
 
         switch (chunkType)
         {
-            case 0: // 【霓虹巡航大道】寬敞 5 線道，每隔 4 排隨機單側尖刺，正中央保持絕對安全通道
+            case 0: // 【霓虹高速巡航大道】寬敞 5 線道衝刺，交錯單側尖刺與高亮金鑽
                 BuildSection(chunk.transform, startRow, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 for (int r = startRow + 2; r < startRow + rowsInChunk - 2; r += 4)
                 {
                     int spikeCol = (Random.value > 0.5f) ? -1 : 1;
                     if (Random.value > 0.6f) spikeCol = (spikeCol == -1) ? -2 : 2;
                     CreateHazard(chunk.transform, new Vector3(spikeCol * COL_WIDTH, 0.5f, r * ROW_LEN));
-                    CreateGem(chunk.transform, new Vector3(0, 0.8f, (r + 2) * ROW_LEN));
+                    CreateGem(chunk.transform, new Vector3(0, 0.95f, (r + 2) * ROW_LEN));
                 }
                 break;
 
-            case 1: // 【流暢 S 彎變道】3 線道平滑過渡，相鄰排至少重疊 2 線道，連續無斷層
+            case 1: // 【虛空躍崖大斷層】彈跳墊跨越 10 米深淵！空中懸浮璀璨彩虹金鑽弧線，遠方寬敞 5 線道著陸台
+                BuildSection(chunk.transform, startRow, startRow + 5, new int[] { -1, 0, 1 });
+                // 於斷層邊緣第 4 排設置彈跳墊
+                int pRow1 = startRow + 4;
+                CreateJumpPad(chunk.transform, new Vector3(-COL_WIDTH, 0.1f, pRow1 * ROW_LEN));
+                CreateJumpPad(chunk.transform, new Vector3(0, 0.1f, pRow1 * ROW_LEN));
+                CreateJumpPad(chunk.transform, new Vector3(COL_WIDTH, 0.1f, pRow1 * ROW_LEN));
+
+                // 斷層空中懸浮引導金鑽 (5 顆拋物線金鑽)
+                float[] arcH1 = new float[] { 2.4f, 3.8f, 4.8f, 3.8f, 2.4f };
+                for (int h = 0; h < arcH1.Length; h++)
+                {
+                    CreateGem(chunk.transform, new Vector3(0, arcH1[h], (pRow1 + 1 + h) * ROW_LEN));
+                }
+                // 斷層深淵 (pRow1+1 至 pRow1+5 完全懸空)，著陸平台自第 10 排開始！
+                BuildSection(chunk.transform, startRow + 10, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
+                break;
+
+            case 2: // 【雙重手動跳躍斷層】考驗空白鍵精準起跳！兩處 4 米虛空斷崖，金鑽懸於裂口正上方導引
+                BuildSection(chunk.transform, startRow, startRow + 5, new int[] { -1, 0, 1 });
+                CreateGem(chunk.transform, new Vector3(0, 1.4f, (startRow + 5.5f) * ROW_LEN)); // 1 號斷層導引金鑽
+                // 裂口：第 5, 6 排為 4 米深淵斷層
+                BuildSection(chunk.transform, startRow + 7, startRow + 12, new int[] { -1, 0, 1 });
+                CreateGem(chunk.transform, new Vector3(0, 1.4f, (startRow + 12.5f) * ROW_LEN)); // 2 號斷層導引金鑽
+                // 裂口：第 12, 13 排為 4 米深淵斷層
+                BuildSection(chunk.transform, startRow + 14, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
+                break;
+
+            case 3: // 【虛空浮石連續斷層群】交替孤島飛躍！左右穿梭跳台，考驗搖桿/左右鍵靈敏變道
+                BuildSection(chunk.transform, startRow, startRow + 3, new int[] { -2, -1 });
+                CreateGem(chunk.transform, new Vector3(-COL_WIDTH * 1.5f, 0.95f, (startRow + 1) * ROW_LEN));
+                // 第 3 排為斷層
+                BuildSection(chunk.transform, startRow + 4, startRow + 7, new int[] { 1, 2 });
+                CreateGem(chunk.transform, new Vector3(COL_WIDTH * 1.5f, 0.95f, (startRow + 5) * ROW_LEN));
+                // 第 7 排為斷層
+                BuildSection(chunk.transform, startRow + 8, startRow + 11, new int[] { -1, 0, 1 });
+                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 9) * ROW_LEN));
+                // 第 11 排為斷層
+                BuildSection(chunk.transform, startRow + 12, startRow + 15, new int[] { -2, -1 });
+                CreateGem(chunk.transform, new Vector3(-COL_WIDTH * 1.5f, 0.95f, (startRow + 13) * ROW_LEN));
+                // 第 15 排為斷層
+                BuildSection(chunk.transform, startRow + 16, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
+                break;
+
+            case 4: // 【虛空細樑獨木橋】兩側皆為無底深淵！僅中央單線道橫跨 22 米高空，極致心跳挑戰
+                BuildSection(chunk.transform, startRow, startRow + 3, new int[] { -2, -1, 0, 1, 2 });
+                // 兩側截斷，僅保留 0 號線道高空窄樑
+                BuildSection(chunk.transform, startRow + 3, startRow + 16, new int[] { 0 });
+                for (int r = startRow + 4; r < startRow + 16; r += 3)
+                {
+                    CreateGem(chunk.transform, new Vector3(0, 0.95f, r * ROW_LEN));
+                }
+                BuildSection(chunk.transform, startRow + 16, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
+                break;
+
+            case 5: // 【階梯高低斷崖落下】自 2 米高台俯衝躍下！感受極速重力加速度與深淵落差
+                BuildSection(chunk.transform, startRow, startRow + 6, new int[] { -1, 0, 1 }, height: 2.0f);
+                CreateGem(chunk.transform, new Vector3(0, 2.95f, (startRow + 3) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(0, 2.0f, (startRow + 6.5f) * ROW_LEN));
+                // 第 6, 7 排為空中下墜斷層，小球順著重力俯衝落入地面
+                BuildSection(chunk.transform, startRow + 8, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 }, height: 0.0f);
+                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 12) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 16) * ROW_LEN));
+                break;
+
+            case 6: // 【雙分叉中央大深淵】正中間 6 米全鏤空深淵！左右兩側獨立飛馳
+                BuildSection(chunk.transform, startRow, startRow + 3, new int[] { -2, -1, 0, 1, 2 });
+                // 中央 3 線道鏤空，僅留左右外側
+                BuildSection(chunk.transform, startRow + 3, startRow + 16, new int[] { -2, 2 });
+                CreateGem(chunk.transform, new Vector3(-COL_WIDTH * 2, 0.95f, (startRow + 6) * ROW_LEN));
+                CreateHazard(chunk.transform, new Vector3(-COL_WIDTH * 2, 0.5f, (startRow + 10) * ROW_LEN));
+                CreateHazard(chunk.transform, new Vector3(COL_WIDTH * 2, 0.5f, (startRow + 6) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(COL_WIDTH * 2, 0.95f, (startRow + 10) * ROW_LEN));
+                BuildSection(chunk.transform, startRow + 16, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
+                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 18) * ROW_LEN));
+                break;
+
+            case 7: // 【連環雙重彈射深淵】兩段式連續空中大跳躍！爽快感翻倍
+                BuildSection(chunk.transform, startRow, startRow + 3, new int[] { -1, 0, 1 });
+                // 第 1 級跳台
+                int jp1 = startRow + 2;
+                CreateJumpPad(chunk.transform, new Vector3(0, 0.1f, jp1 * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(0, 3.2f, (jp1 + 2) * ROW_LEN));
+                // 第 3~5 排為斷層，落在第 6, 7 排空中島
+                BuildSection(chunk.transform, startRow + 6, startRow + 9, new int[] { -1, 0, 1 });
+                // 第 2 級跳台
+                int jp2 = startRow + 8;
+                CreateJumpPad(chunk.transform, new Vector3(0, 0.1f, jp2 * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(0, 3.2f, (jp2 + 2) * ROW_LEN));
+                // 第 9~11 排為斷層，落在第 12 排大平台
+                BuildSection(chunk.transform, startRow + 12, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
+                break;
+
+            case 8: // 【流暢 S 彎變道】3 線道蛇行穿梭，順滑過彎
                 for (int i = 0; i < rowsInChunk; i++)
                 {
                     int r = startRow + i;
-                    int centerCol = 0;
-                    if (i < 5) centerCol = -1;
-                    else if (i < 10) centerCol = 0;
-                    else if (i < 15) centerCol = 1;
-                    else centerCol = 0;
-
+                    int centerCol = (i < 5) ? -1 : (i < 10) ? 0 : (i < 15) ? 1 : 0;
                     int[] activeCols = new int[] { centerCol - 1, centerCol, centerCol + 1 };
-                    foreach (int c in activeCols)
-                    {
-                        CreateSingleTile(chunk.transform, c, r);
-                    }
-
-                    if (i % 3 == 0)
-                    {
-                        CreateGem(chunk.transform, new Vector3(centerCol * COL_WIDTH, 0.8f, r * ROW_LEN));
-                    }
+                    foreach (int c in activeCols) CreateSingleTile(chunk.transform, c, r);
+                    if (i % 3 == 0) CreateGem(chunk.transform, new Vector3(centerCol * COL_WIDTH, 0.95f, r * ROW_LEN));
                 }
                 break;
 
-            case 2: // 【星空高空躍動跳台】彈跳墊啟動 + 空中彩虹水晶弧線 + 底部與前方 100% 實體著陸跑道
-                // 底層 20 排全線道全實體鋪滿，徹底消除掉入虛空或跳不過的意外！
+            case 9: // 【金鑽狂歡長廊】無障礙大獎勵！高密度金光閃閃鑽石陣列
                 BuildSection(chunk.transform, startRow, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
-                // 於第 4 排設置彈跳墊 (3 線道齊備)
-                int padRow = startRow + 4;
-                CreateJumpPad(chunk.transform, new Vector3(-COL_WIDTH, 0.1f, padRow * ROW_LEN));
-                CreateJumpPad(chunk.transform, new Vector3(0, 0.1f, padRow * ROW_LEN));
-                CreateJumpPad(chunk.transform, new Vector3(COL_WIDTH, 0.1f, padRow * ROW_LEN));
-
-                // 躍起軌跡懸浮彩虹水晶
-                float[] arcHeights = new float[] { 2.2f, 3.5f, 4.5f, 4.8f, 4.5f, 3.5f, 2.2f };
-                for (int h = 0; h < arcHeights.Length; h++)
-                {
-                    CreateGem(chunk.transform, new Vector3(0, arcHeights[h], (padRow + 1 + h) * ROW_LEN));
-                }
-                break;
-
-            case 3: // 【交錯繞樁考驗】交錯式赤紅尖刺，考驗左右平滑走位，始終具備 3 條順暢通路
-                BuildSection(chunk.transform, startRow, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
-                CreateHazard(chunk.transform, new Vector3(-COL_WIDTH, 0.5f, (startRow + 3) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(COL_WIDTH, 0.8f, (startRow + 3) * ROW_LEN));
-
-                CreateHazard(chunk.transform, new Vector3(COL_WIDTH, 0.5f, (startRow + 8) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(-COL_WIDTH, 0.8f, (startRow + 8) * ROW_LEN));
-
-                CreateHazard(chunk.transform, new Vector3(0, 0.5f, (startRow + 13) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(-COL_WIDTH, 0.8f, (startRow + 13) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(COL_WIDTH, 0.8f, (startRow + 13) * ROW_LEN));
-
-                CreateHazard(chunk.transform, new Vector3(-COL_WIDTH, 0.5f, (startRow + 17) * ROW_LEN));
-                break;
-
-            case 4: // 【水晶狂歡長廊】無障礙高速狂飆，菱形與交錯璀璨寶石大豐收
-                BuildSection(chunk.transform, startRow, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
-                CreateGem(chunk.transform, new Vector3(-COL_WIDTH, 0.8f, (startRow + 3) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(COL_WIDTH, 0.8f, (startRow + 3) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(0, 0.8f, (startRow + 6) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(-COL_WIDTH * 1.5f, 0.8f, (startRow + 10) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(COL_WIDTH * 1.5f, 0.8f, (startRow + 10) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(0, 0.8f, (startRow + 14) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(-COL_WIDTH, 0.8f, (startRow + 17) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(COL_WIDTH, 0.8f, (startRow + 17) * ROW_LEN));
-                break;
-
-            case 5: // 【雙軌分叉特快】中央自然鏤空為左右各 2 線道，並流暢匯流
-                BuildSection(chunk.transform, startRow, startRow + 3, new int[] { -2, -1, 0, 1, 2 });
-                BuildSection(chunk.transform, startRow + 3, startRow + 16, new int[] { -2, -1, 1, 2 });
-                CreateHazard(chunk.transform, new Vector3(-COL_WIDTH * 2, 0.5f, (startRow + 8) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(-COL_WIDTH, 0.8f, (startRow + 8) * ROW_LEN));
-                CreateHazard(chunk.transform, new Vector3(COL_WIDTH * 2, 0.5f, (startRow + 11) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(COL_WIDTH, 0.8f, (startRow + 11) * ROW_LEN));
-                BuildSection(chunk.transform, startRow + 16, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
-                CreateGem(chunk.transform, new Vector3(0, 0.8f, (startRow + 18) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(-COL_WIDTH, 0.95f, (startRow + 3) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(COL_WIDTH, 0.95f, (startRow + 3) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 6) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(-COL_WIDTH * 1.5f, 0.95f, (startRow + 10) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(COL_WIDTH * 1.5f, 0.95f, (startRow + 10) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 14) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(-COL_WIDTH, 0.95f, (startRow + 17) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(COL_WIDTH, 0.95f, (startRow + 17) * ROW_LEN));
                 break;
         }
 
@@ -621,7 +668,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         GameObject gem = new GameObject("Gem");
         gem.transform.SetParent(parent);
         gem.transform.position = pos;
-        gem.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
+        gem.transform.localScale = new Vector3(0.9f, 0.9f, 0.9f);
         SphereCollider sc = gem.AddComponent<SphereCollider>();
         sc.isTrigger = true;
         sc.radius = 0.8f;

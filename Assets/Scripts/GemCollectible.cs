@@ -10,6 +10,8 @@ public class GemCollectible : MonoBehaviour
 
     private Vector3 initialPos;
     private bool isCollected = false;
+    private Transform haloTransform;
+    private Light glowLight;
 
     void Awake()
     {
@@ -17,6 +19,7 @@ public class GemCollectible : MonoBehaviour
         EnsureCrystalMesh();
         EnsureRendererAndMaterial();
         EnsureSparkleLight();
+        EnsureHaloRing();
     }
 
     void Start()
@@ -30,6 +33,18 @@ public class GemCollectible : MonoBehaviour
         transform.Rotate(new Vector3(25f, rotateSpeed, 15f) * Time.deltaTime, Space.World);
         float newY = initialPos.y + Mathf.Sin(Time.time * floatFrequency) * floatAmplitude;
         transform.position = new Vector3(initialPos.x, newY, initialPos.z);
+
+        // 光環反向旋轉，營造超凡能量場
+        if (haloTransform != null)
+        {
+            haloTransform.Rotate(Vector3.up * -160f * Time.deltaTime, Space.Self);
+        }
+
+        // 呼吸式動態高亮脈衝光暈 (使寶石在遠處亦格外醒目，高亮穿透地磚)
+        if (glowLight != null)
+        {
+            glowLight.intensity = 2.8f + Mathf.PingPong(Time.time * 4.0f, 1.5f);
+        }
     }
 
     /// <summary>
@@ -44,13 +59,13 @@ public class GemCollectible : MonoBehaviour
         Mesh mesh = new Mesh();
         mesh.name = "CrystalDiamondMesh";
 
-        // 6個原始頂點：上尖端、下尖端、赤道四頂點
-        Vector3 top = new Vector3(0, 0.65f, 0);
-        Vector3 bottom = new Vector3(0, -0.65f, 0);
-        Vector3 vNorth = new Vector3(0, 0, 0.48f);
-        Vector3 vEast = new Vector3(0.48f, 0, 0);
-        Vector3 vSouth = new Vector3(0, 0, -0.48f);
-        Vector3 vWest = new Vector3(-0.48f, 0, 0);
+        // 6個原始頂點：上尖端、下尖端、赤道四頂點 (加大尺寸至 0.85m 高，強化視覺辨識)
+        Vector3 top = new Vector3(0, 0.85f, 0);
+        Vector3 bottom = new Vector3(0, -0.85f, 0);
+        Vector3 vNorth = new Vector3(0, 0, 0.62f);
+        Vector3 vEast = new Vector3(0.62f, 0, 0);
+        Vector3 vSouth = new Vector3(0, 0, -0.62f);
+        Vector3 vWest = new Vector3(-0.62f, 0, 0);
 
         // 為了呈現寶石折射立體切面感 (Flat Shading Facets)，每個三角形獨立頂點
         Vector3[] vertices = new Vector3[24];
@@ -79,7 +94,7 @@ public class GemCollectible : MonoBehaviour
         SphereCollider sc = GetComponent<SphereCollider>();
         if (sc != null)
         {
-            sc.radius = 0.55f;
+            sc.radius = 0.7f;
             sc.isTrigger = true;
         }
     }
@@ -96,41 +111,109 @@ public class GemCollectible : MonoBehaviour
     }
 
     /// <summary>
-    /// 自動為寶石物件掛載渲染器與璀璨發光材質，杜絕白方塊或缺材質情況
+    /// 自動為寶石物件掛載渲染器與極高對比燦爛金黃 (Radiant Golden Topaz) HDR 超強發光材質，杜絕與青藍地磚混淆
     /// </summary>
     void EnsureRendererAndMaterial()
     {
         MeshRenderer mr = GetComponent<MeshRenderer>();
         if (mr == null) mr = gameObject.AddComponent<MeshRenderer>();
-        if (mr.sharedMaterial == null)
+
+        Material mat = mr.material;
+        if (mat == null || mat.name.Contains("Default") || !mat.name.Contains("RadiantGold"))
         {
-            Material mat = new Material(Shader.Find("Standard"));
-            mat.name = "Mat_DynamicGem";
-            mat.color = new Color(0.15f, 0.95f, 1f, 0.95f);
-            mat.SetColor("_EmissionColor", new Color(0.2f, 1.1f, 1.4f));
-            mat.EnableKeyword("_EMISSION");
-            mat.SetFloat("_Glossiness", 0.95f);
-            mat.SetFloat("_Metallic", 0.4f);
-            mr.material = mat;
+            mat = new Material(Shader.Find("Standard"));
+            mat.name = "Mat_RadiantGold";
         }
+
+        // 燦爛金燦核心，在深藍與青藍賽道上形成最強色彩反差
+        mat.color = new Color(1.0f, 0.88f, 0.12f, 1.0f);
+        mat.SetColor("_EmissionColor", new Color(3.2f, 2.5f, 0.4f)); // 超高亮 HDR 閃耀
+        mat.EnableKeyword("_EMISSION");
+        mat.SetFloat("_Metallic", 0.7f);
+        mat.SetFloat("_Glossiness", 0.98f);
+        mr.material = mat;
     }
 
     /// <summary>
-    /// 自動添加寶石周圍的水晶發光微粒 / 點光源
+    /// 自動添加寶石周圍的水晶發光微粒 / 點光源 (高亮金黃光暈)
     /// </summary>
     void EnsureSparkleLight()
     {
-        Light pLight = GetComponentInChildren<Light>();
-        if (pLight == null)
+        glowLight = GetComponentInChildren<Light>();
+        if (glowLight == null)
         {
             GameObject lObj = new GameObject("GemGlowLight");
             lObj.transform.SetParent(transform, false);
-            pLight = lObj.AddComponent<Light>();
-            pLight.type = LightType.Point;
-            pLight.color = new Color(0.2f, 0.95f, 1f); // 璀璨青空藍
-            pLight.range = 3.5f;
-            pLight.intensity = 1.8f;
+            glowLight = lObj.AddComponent<Light>();
+            glowLight.type = LightType.Point;
         }
+        glowLight.color = new Color(1.0f, 0.85f, 0.25f); // 燦爛高亮金黃
+        glowLight.range = 6.0f;
+        glowLight.intensity = 3.5f;
+    }
+
+    /// <summary>
+    /// 自動生成環繞寶石旋轉的星環光帶 (Energy Halo Ring)，進一步強化遠距識別度
+    /// </summary>
+    void EnsureHaloRing()
+    {
+        Transform existing = transform.Find("GemHaloRing");
+        if (existing != null)
+        {
+            haloTransform = existing;
+            return;
+        }
+
+        GameObject ringObj = new GameObject("GemHaloRing");
+        ringObj.transform.SetParent(transform, false);
+        ringObj.transform.localPosition = Vector3.zero;
+        ringObj.transform.localRotation = Quaternion.Euler(35f, 0f, 25f);
+        ringObj.transform.localScale = Vector3.one * 1.1f;
+
+        MeshFilter mf = ringObj.AddComponent<MeshFilter>();
+        MeshRenderer mr = ringObj.AddComponent<MeshRenderer>();
+
+        // 動態建構 16 段平滑環狀多邊形網格
+        Mesh ringMesh = new Mesh();
+        int segments = 16;
+        Vector3[] verts = new Vector3[segments * 2];
+        int[] tris = new int[segments * 6];
+        float innerR = 0.85f;
+        float outerR = 1.15f;
+
+        for (int i = 0; i < segments; i++)
+        {
+            float angle = (i / (float)segments) * Mathf.PI * 2f;
+            float cos = Mathf.Cos(angle);
+            float sin = Mathf.Sin(angle);
+
+            verts[i * 2] = new Vector3(cos * innerR, 0, sin * innerR);
+            verts[i * 2 + 1] = new Vector3(cos * outerR, 0, sin * outerR);
+
+            int next = (i + 1) % segments;
+            int tIdx = i * 6;
+
+            tris[tIdx] = i * 2;
+            tris[tIdx + 1] = i * 2 + 1;
+            tris[tIdx + 2] = next * 2;
+
+            tris[tIdx + 3] = next * 2;
+            tris[tIdx + 4] = i * 2 + 1;
+            tris[tIdx + 5] = next * 2 + 1;
+        }
+
+        ringMesh.vertices = verts;
+        ringMesh.triangles = tris;
+        ringMesh.RecalculateNormals();
+        mf.sharedMesh = ringMesh;
+
+        Material haloMat = new Material(Shader.Find("Standard"));
+        haloMat.color = new Color(1.0f, 0.95f, 0.35f, 0.9f);
+        haloMat.SetColor("_EmissionColor", new Color(3.5f, 2.8f, 0.5f));
+        haloMat.EnableKeyword("_EMISSION");
+        mr.material = haloMat;
+
+        haloTransform = ringObj.transform;
     }
 
     private void OnTriggerEnter(Collider other)
