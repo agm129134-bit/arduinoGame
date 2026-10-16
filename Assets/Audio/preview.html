@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>遊戲音樂與音效試聽中心</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0a0e17 0%, #162032 100%);
+            color: #e0f2fe;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 860px;
+            width: 100%;
+        }
+        h1 {
+            color: #00f2fe;
+            text-shadow: 0 0 15px rgba(0,242,254,0.4);
+            border-bottom: 2px solid #00f2fe;
+            padding-bottom: 12px;
+        }
+        h2 {
+            color: #ffcc00;
+            margin-top: 35px;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 242, 254, 0.25);
+            border-radius: 12px;
+            padding: 18px 24px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(8px);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: #00f2fe;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        .badge {
+            background: #0077b6;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+        .desc {
+            color: #94a3b8;
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+        audio {
+            width: 100%;
+            outline: none;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 《極速躍動 3D》音效與背景音樂試聽中心</h1>
+        <p style="color: #cbd5e1; font-size: 1.1rem;">
+            點擊下方各音軌的播放按鈕即可直接試聽！請挑選您最喜歡的 BGM 風格：
+        </p>
+
+        <h2>🎧 背景音樂 (BGM) 三大版本</h2>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">⚡ 版本 A：賽博霓虹脈衝 (Cyber Neon Pulse)</span>
+                <span class="badge">130 BPM · 推薦主打</span>
+            </div>
+            <div class="desc">
+                四四拍電子鼓組 + 16分音符八度奔馳 Bassline + 賽博霓虹 Lead 主旋律。動感節奏十足，最契合高速平衡球閃避跳躍的熱血手感！
+            </div>
+            <audio controls src="bgm_cyber_neon.wav"></audio>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🕹️ 版本 B：復古極速像素 (Chiptune Rush)</span>
+                <span class="badge">142 BPM · 紅白機街機</span>
+            </div>
+            <div class="desc">
+                經典 8-bit / 16-bit 方波與三角波高速琶音，顆粒感十足的雜訊打擊樂，充滿歡快衝刺與懷舊電玩闖關感。
+            </div>
+            <audio controls src="bgm_chiptune_rush.wav"></audio>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🌌 版本 C：深空失重重力 (Deep Space Gravity)</span>
+                <span class="badge">126 BPM · 太空氛圍</span>
+            </div>
+            <div class="desc">
+                沉穩強勁的 Sub-bass 次重音 + 空靈浩瀚的合成器音墊與立體聲撥弦，營造在無垠深空中駕馭平衡球的懸浮失重感。
+            </div>
+            <audio controls src="bgm_deep_gravity.wav"></audio>
+        </div>
+
+        <h2>🔊 遊戲即時動作音效 (SFX)</h2>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🦘 起跳音效 (Jump)</span>
+                <span class="badge">超音波揮動 / 空白鍵觸發</span>
+            </div>
+            <div class="desc">向上急劇攀升的滑頻 (Upward Pitch Bend) 搭配空氣彈簧噴射感。</div>
+            <audio controls src="sfx_jump.wav"></audio>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">💎 吃寶石音效 (Gem Collect)</span>
+                <span class="badge">撞擊菱形寶石觸發</span>
+            </div>
+            <div class="desc">晶瑩剔透的水晶三和弦琶音 (E6-G#6-B6) 與空間回音殘響。</div>
+            <audio controls src="sfx_gem.wav"></audio>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">💥 墜落 / 撞毀音效 (Crash / Fall)</span>
+                <span class="badge">掉出跑道或撞刺觸發</span>
+            </div>
+            <div class="desc">重力墜落低音與賽博故障撞擊雜音。</div>
+            <audio controls src="sfx_fall.wav"></audio>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🏆 完美通關勝利號角 (Victory Fanfare)</span>
+                <span class="badge">100% 抵達終點觸發</span>
+            </div>
+            <div class="desc">輝煌明亮的大三和弦合成銅管勝利樂句。</div>
+            <audio controls src="sfx_victory.wav"></audio>
+        </div>
+    </div>
+</body>
+</html>
