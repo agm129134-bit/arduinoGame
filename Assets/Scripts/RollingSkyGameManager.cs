@@ -42,6 +42,9 @@ public class RollingSkyGameManager : MonoBehaviour
     void Start()
     {
         isBuilderMode = (PlayerPrefs.GetInt("IsBuilderMode", 0) == 1);
+        EnsureAllUI();
+        BindAllButtonsRuntime();
+
         if (isBuilderMode)
         {
             // 進入自訂建造模式：隱藏常規跑酷 HUD 與預設小球
@@ -52,11 +55,12 @@ public class RollingSkyGameManager : MonoBehaviour
             }
             if (ball != null) ball.gameObject.SetActive(false);
 
-            EnsureAllUI();
             if (progressBar != null) progressBar.gameObject.SetActive(false);
             if (progressText != null) progressText.gameObject.SetActive(false);
             if (gemText != null) gemText.gameObject.SetActive(false);
             if (hardwareStatusText != null) hardwareStatusText.gameObject.SetActive(false);
+            if (gameOverPanel != null) gameOverPanel.SetActive(false);
+            if (pausePanel != null) pausePanel.SetActive(false);
 
             // 確保 TrackBuilderManager 啟動
             if (FindAnyObjectByType<TrackBuilderManager>() == null)
@@ -482,6 +486,14 @@ public class RollingSkyGameManager : MonoBehaviour
     public void TriggerGameOver(string reason)
     {
         if (isGameOver || isVictory) return;
+
+        if (isBuilderMode)
+        {
+            // 在自訂建造模式試玩中，由 TrackBuilderManager 掌管死亡與返回編輯，不彈出常規 GameOver 面板
+            TrackBuilderManager.Instance?.OnTestBallDied(reason);
+            return;
+        }
+
         isGameOver = true;
 
         if (pausePanel != null) pausePanel.SetActive(false);

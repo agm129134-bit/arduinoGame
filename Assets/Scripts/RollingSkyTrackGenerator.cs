@@ -434,9 +434,9 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                 CreateJumpPad(chunk.transform, new Vector3(-COL_WIDTH, 0.1f, (startRow + 4) * ROW_LEN));
                 CreateJumpPad(chunk.transform, new Vector3(0, 0.1f, (startRow + 4) * ROW_LEN));
                 CreateJumpPad(chunk.transform, new Vector3(COL_WIDTH, 0.1f, (startRow + 4) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(0, 3.5f, (startRow + 7) * ROW_LEN));
-                // 著陸區：寬度擴展為 5 欄，確保跳躍後安全著陸
-                BuildSection(chunk.transform, startRow + 9, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
+                CreateGem(chunk.transform, new Vector3(0, 3.5f, (startRow + 5) * ROW_LEN));
+                // 著陸區：間隔縮小為 2 排 (4 米)，有彈跳墊推進飛躍極為流暢，且即使沒踩中彈墊，普通跳躍也能輕鬆越過！
+                BuildSection(chunk.transform, startRow + 7, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 break;
             case 3: // 雙側尖刺封路，單路通行
                 BuildSection(chunk.transform, startRow, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
@@ -558,6 +558,8 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         pad.transform.position = pos;
         pad.transform.localScale = new Vector3(1.6f, 0.2f, 1.6f);
         pad.GetComponent<MeshRenderer>().material = matJumpPad;
+        BoxCollider bc = pad.GetComponent<BoxCollider>();
+        if (bc != null) bc.isTrigger = true;
         pad.AddComponent<JumpPad>();
     }
 
@@ -567,6 +569,9 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         gem.transform.SetParent(parent);
         gem.transform.position = pos;
         gem.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
+        SphereCollider sc = gem.AddComponent<SphereCollider>();
+        sc.isTrigger = true;
+        sc.radius = 0.8f;
         MeshRenderer mr = gem.AddComponent<MeshRenderer>();
         mr.material = matGem;
         gem.AddComponent<GemCollectible>();

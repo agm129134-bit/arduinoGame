@@ -59,9 +59,13 @@ public class TrackBuilderManager : MonoBehaviour
         if (!isEditMode)
         {
             // 測試遊玩中按下 ESC 可隨時重返建造模式；若小球墜落或死亡亦自動返回
-            if (Input.GetKeyDown(KeyCode.Escape) || (testBall != null && (testBall.IsDead || testBall.transform.position.y < -4f)))
+            if (Input.GetKeyDown(KeyCode.Escape))
             {
                 StopTestPlay();
+            }
+            else if (testBall != null && (testBall.IsDead || testBall.transform.position.y < -4f))
+            {
+                OnTestBallDied(testBall.IsDead ? "撞擊障礙失誤" : "小球墜落虛空");
             }
             return;
         }
@@ -173,6 +177,8 @@ public class TrackBuilderManager : MonoBehaviour
                 obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 obj.transform.position = new Vector3(pos.x, 0.1f, pos.z);
                 obj.transform.localScale = new Vector3(COL_WIDTH * 0.9f, 0.3f, ROW_LEN * 0.9f);
+                BoxCollider jbc = obj.GetComponent<BoxCollider>();
+                if (jbc != null) jbc.isTrigger = true;
                 obj.AddComponent<JumpPad>();
                 break;
             case 3: // 尖刺
@@ -185,6 +191,9 @@ public class TrackBuilderManager : MonoBehaviour
                 obj = new GameObject("Gem");
                 obj.transform.position = new Vector3(pos.x, 0.8f, pos.z);
                 obj.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
+                SphereCollider gsc = obj.AddComponent<SphereCollider>();
+                gsc.isTrigger = true;
+                gsc.radius = 0.8f;
                 obj.AddComponent<GemCollectible>();
                 break;
         }
@@ -262,19 +271,34 @@ public class TrackBuilderManager : MonoBehaviour
         camCtrl.target = bObj.transform;
     }
 
+    public void OnTestBallDied(string reason)
+    {
+        Debug.Log($"[TrackBuilder] 試玩小球判定結束: {reason}，重設返回編輯視角");
+        StopTestPlay();
+        if (infoText != null)
+        {
+            infoText.text = $"<color=orange>【試玩結束】{reason}</color> | 點擊下方 [▶ 測試遊玩] 可再次實測 | [WASD] 繼續編輯地圖";
+        }
+    }
+
     public void StopTestPlay()
     {
         isEditMode = true;
+        Time.timeScale = 1.0f; // 確保時間尺度正常
+
         if (cursorVisual != null) cursorVisual.SetActive(true);
         if (builderUIPanel != null) builderUIPanel.SetActive(true);
 
         if (testBall != null)
         {
             Destroy(testBall.gameObject);
+            testBall = null;
         }
 
         RollingSkyCamera camCtrl = mainCamera.GetComponent<RollingSkyCamera>();
         if (camCtrl != null) Destroy(camCtrl);
+
+        UpdateCameraView();
     }
 
     void BuildUI()

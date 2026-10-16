@@ -18,9 +18,15 @@ public class RollingSkyBallController : MonoBehaviour
     [Tooltip("手部微抖死區")]
     public float tiltDeadzone = 0.08f;
 
-    [Header("Ground Check")]
+    [Header("Ground & Jump Polish")]
     public LayerMask groundLayer = ~0;
-    public float groundCheckDistance = 0.55f;
+    public float groundCheckDistance = 0.65f;
+    public float sphereCastRadius = 0.42f;
+    public float coyoteTime = 0.15f;
+    public float jumpBufferTime = 0.15f;
+
+    private float coyoteTimer = 0f;
+    private float jumpBufferTimer = 0f;
 
     private Rigidbody rb;
     private bool isGrounded = true;
@@ -136,6 +142,22 @@ public class RollingSkyBallController : MonoBehaviour
         CheckGrounded();
         ReadInputs();
 
+        // 倒數土狼時間與跳躍緩衝
+        if (coyoteTimer > 0f) coyoteTimer -= Time.deltaTime;
+        if (jumpBufferTimer > 0f) jumpBufferTimer -= Time.deltaTime;
+
+        // 若玩家按下 Space 或跳躍自訂鍵，記錄進跳躍緩衝 (150ms 窗口)
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            jumpBufferTimer = jumpBufferTime;
+        }
+
+        // 當處於跳躍緩衝期且具備起跳條件時，立即起跳！
+        if (jumpBufferTimer > 0f && CanJump())
+        {
+            Jump();
+        }
+
         // 無盡模式下隨著前進里程逐步提升速度
         if (isEndlessMode)
         {
@@ -193,28 +215,54 @@ public class RollingSkyBallController : MonoBehaviour
 
     void CheckGrounded()
     {
-        // 向下射線檢測是否接觸賽道地面
+        Vector3 origin = transform.position;
         RaycastHit hit;
-        Vector3 rayStart = transform.position;
-        if (Physics.Raycast(rayStart, Vector3.down, out hit, groundCheckDistance, groundLayer, QueryTriggerInteraction.Ignore))
+
+        // 1. 球體向下投射 (SphereCast) 檢測：半徑 0.42m，向下偵測 0.25m
+        // 徹底免疫 8cm 地磚拼縫漏檢
+        bool grounded = Physics.SphereCast(origin, sphereCastRadius, Vector3.down, out hit, 0.25f, groundLayer, QueryTriggerInteraction.Ignore);
+
+        // 2. 備援向下三點射線檢測 (中心、左偏、右偏)
+        if (!grounded)
         {
-            isGrounded = true;
+            grounded = Physics.Raycast(origin, Vector3.down, groundCheckDistance, groundLayer, QueryTriggerInteraction.Ignore) ||
+                       Physics.Raycast(origin + Vector3.left * 0.35f, Vector3.down, groundCheckDistance, groundLayer, QueryTriggerInteraction.Ignore) ||
+                       Physics.Raycast(origin + Vector3.right * 0.35f, Vector3.down, groundCheckDistance, groundLayer, QueryTriggerInteraction.Ignore);
         }
-        else
+
+        isGrounded = grounded;
+        if (isGrounded)
         {
-            isGrounded = false;
+            coyoteTimer = coyoteTime;
+        }
+    }
+
+    private void OnCollisionStay(Collision collision)
+    {
+        // 碰撞接面法線向上檢測 (物理層面雙重保證)
+        for (int i = 0; i < collision.contactCount; i++)
+        {
+            if (collision.GetContact(i).normal.y > 0.4f)
+            {
+                isGrounded = true;
+                coyoteTimer = coyoteTime;
+                break;
+            }
         }
     }
 
     public void Jump()
     {
         if (isDead) return;
-        if (!isGrounded) return; // 空中不可二段跳
+        if (!CanJump()) return;
+
+        coyoteTimer = 0f;
+        jumpBufferTimer = 0f;
+        isGrounded = false;
 
         Vector3 vel = rb.linearVelocity;
         vel.y = jumpForce;
         rb.linearVelocity = vel;
-        isGrounded = false;
 
         AudioManager.Instance?.PlayJump();
     }
@@ -249,7 +297,7 @@ public class RollingSkyBallController : MonoBehaviour
         }
     }
 
-    public bool CanJump() => !isDead && isGrounded;
-    public bool IsGrounded => isGrounded;
+    public bool CanJump() => !isDead && (isGrounded || coyoteTimer > 0f);
+    public bool IsGrounded => isGrounded || coyoteTimer > 0f;
     public bool IsDead => isDead;
 }
