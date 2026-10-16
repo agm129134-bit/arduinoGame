@@ -112,6 +112,11 @@ public class RollingSkyMenuManager : MonoBehaviour
 
     void Update()
     {
+        // 特殊除錯按鍵：自由增加寶石數量 (G: +50, F1: +100, F2: +500)
+        if (Input.GetKeyDown(KeyCode.G)) AddDebugGems(50);
+        if (Input.GetKeyDown(KeyCode.F1)) AddDebugGems(100);
+        if (Input.GetKeyDown(KeyCode.F2)) AddDebugGems(500);
+
         // 若在控制器設定分頁，即時刷新硬體感測器數值以供玩家校準
         if (settingsPanel != null && settingsPanel.activeInHierarchy && 
             controllerSettingsPanel != null && controllerSettingsPanel.activeInHierarchy)
@@ -276,6 +281,7 @@ public class RollingSkyMenuManager : MonoBehaviour
 
         // 設定面板底層儲存與重置按鈕
         BindButton(settingsPanel, "Btn_ResetDefaults", OnResetDefaults);
+        BindButton(settingsPanel, "Btn_ResetAllSave", OnResetAllSave);
         BindButton(settingsPanel, "Btn_SaveBack", OnSaveSettings);
 
         // 商店返回按鈕
@@ -611,20 +617,45 @@ public class RollingSkyMenuManager : MonoBehaviour
         if (tReset != null)
         {
             RectTransform rt = tReset.GetComponent<RectTransform>();
-            rt.anchoredPosition = new Vector2(-220, -380);
-            rt.sizeDelta = new Vector2(300, 65);
+            rt.anchoredPosition = new Vector2(-360, -380);
+            rt.sizeDelta = new Vector2(280, 65);
             Text txt = tReset.GetComponentInChildren<Text>();
-            if (txt != null) { txt.fontSize = 24; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
+            if (txt != null) { txt.text = "恢復控制預設 (RESET)"; txt.fontSize = 20; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
+        }
+
+        Transform tResetSave = settingsPanel.transform.Find("Btn_ResetAllSave");
+        if (tResetSave == null)
+        {
+            GameObject bObj = CreateStyledButton(settingsPanel.transform, "Btn_ResetAllSave", "⚠️ 重置全部存檔 (RESET ALL SAVE)", new Vector2(0, -380), new Vector2(330, 65), 18, defaultFont);
+            Image img = bObj.GetComponent<Image>();
+            if (img != null) img.color = new Color(0.6f, 0.12f, 0.15f, 0.95f);
+            Button b = bObj.GetComponent<Button>();
+            if (b != null)
+            {
+                ColorBlock cb = b.colors;
+                cb.normalColor = new Color(0.6f, 0.15f, 0.18f);
+                cb.highlightedColor = new Color(0.9f, 0.2f, 0.25f);
+                cb.pressedColor = new Color(0.4f, 0.08f, 0.1f);
+                b.colors = cb;
+            }
+        }
+        else
+        {
+            RectTransform rt = tResetSave.GetComponent<RectTransform>();
+            rt.anchoredPosition = new Vector2(0, -380);
+            rt.sizeDelta = new Vector2(330, 65);
+            Text txt = tResetSave.GetComponentInChildren<Text>();
+            if (txt != null) { txt.text = "⚠️ 重置全部存檔 (RESET ALL SAVE)"; txt.fontSize = 18; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
         }
 
         Transform tSave = settingsPanel.transform.Find("Btn_SaveBack");
         if (tSave != null)
         {
             RectTransform rt = tSave.GetComponent<RectTransform>();
-            rt.anchoredPosition = new Vector2(220, -380);
-            rt.sizeDelta = new Vector2(420, 65);
+            rt.anchoredPosition = new Vector2(360, -380);
+            rt.sizeDelta = new Vector2(280, 65);
             Text txt = tSave.GetComponentInChildren<Text>();
-            if (txt != null) { txt.text = "儲存並返回 (SAVE & BACK)"; txt.fontSize = 24; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
+            if (txt != null) { txt.text = "儲存並返回 (SAVE & BACK)"; txt.fontSize = 20; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
         }
 
         // 3. 確保 AudioSettingsPanel 存在
@@ -961,6 +992,51 @@ public class RollingSkyMenuManager : MonoBehaviour
         SelectBgmTrack(0);
 
         Debug.Log("⚙️ 所有設定已重設為出廠最佳預設值！");
+    }
+
+    public void AddDebugGems(int count)
+    {
+        int totalGems = PlayerPrefs.GetInt("TotalGems", 0) + count;
+        PlayerPrefs.SetInt("TotalGems", totalGems);
+        PlayerPrefs.Save();
+        RefreshMainMenuStatus();
+        RefreshShopUI();
+        Debug.Log($"💎 [Debug] 寶石已增加 {count}！當前累計總寶石: {totalGems}");
+    }
+
+    public void OnResetAllSave()
+    {
+        ClearEventFocus();
+        Debug.Log("⚠️ 正在執行全域存檔重置 (RESET ALL SAVE)...");
+
+        // 1. 寶石歸零
+        PlayerPrefs.SetInt("TotalGems", 0);
+
+        // 2. 無盡模式最高分歸零
+        PlayerPrefs.SetInt("Endless_HighScore", 0);
+
+        // 3. 所有 10 關通關狀態歸零
+        for (int i = 1; i <= 10; i++)
+        {
+            PlayerPrefs.SetInt($"Level_{i}_Completed", 0);
+        }
+
+        // 4. 重置皮膚解鎖 (第0套預設解鎖，其餘鎖定)
+        PlayerPrefs.SetInt("Skin_Unlocked_0", 1);
+        for (int i = 1; i <= 4; i++)
+        {
+            PlayerPrefs.SetInt($"Skin_Unlocked_{i}", 0);
+        }
+        PlayerPrefs.SetInt("EquippedBallSkin", 0);
+
+        PlayerPrefs.Save();
+
+        // 5. 立即刷新各 UI
+        RefreshMainMenuStatus();
+        EnsureLevelSelect10Grid();
+        RefreshShopUI();
+
+        Debug.Log("✅ 全域存檔重置完成！所有關卡通關狀態、無盡高分、皮膚解鎖與寶石已全數重置為初始狀態。");
     }
 
     void LoadAllSettings()

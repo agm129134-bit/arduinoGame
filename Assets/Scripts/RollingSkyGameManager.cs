@@ -29,6 +29,7 @@ public class RollingSkyGameManager : MonoBehaviour
     private bool isVictory = false;
     private bool isPaused = false;
     private bool isEndlessMode = false;
+    private bool isBuilderMode = false;
 
     private ArduinoReceiver arduino;
 
@@ -40,6 +41,32 @@ public class RollingSkyGameManager : MonoBehaviour
 
     void Start()
     {
+        isBuilderMode = (PlayerPrefs.GetInt("IsBuilderMode", 0) == 1);
+        if (isBuilderMode)
+        {
+            // 進入自訂建造模式：隱藏常規跑酷 HUD 與預設小球
+            if (ball == null)
+            {
+                RollingSkyBallController bc = FindAnyObjectByType<RollingSkyBallController>();
+                if (bc != null) ball = bc.transform;
+            }
+            if (ball != null) ball.gameObject.SetActive(false);
+
+            EnsureAllUI();
+            if (progressBar != null) progressBar.gameObject.SetActive(false);
+            if (progressText != null) progressText.gameObject.SetActive(false);
+            if (gemText != null) gemText.gameObject.SetActive(false);
+            if (hardwareStatusText != null) hardwareStatusText.gameObject.SetActive(false);
+
+            // 確保 TrackBuilderManager 啟動
+            if (FindAnyObjectByType<TrackBuilderManager>() == null)
+            {
+                GameObject builderObj = new GameObject("TrackBuilderManager");
+                builderObj.AddComponent<TrackBuilderManager>();
+            }
+            return;
+        }
+
         isEndlessMode = (PlayerPrefs.GetInt("IsEndlessMode", 0) == 1);
 
         if (ball == null)
@@ -82,6 +109,13 @@ public class RollingSkyGameManager : MonoBehaviour
 
     void Update()
     {
+        // 特殊除錯按鍵：自由增加寶石數量 (G: +50, F1: +100, F2: +500)
+        if (Input.GetKeyDown(KeyCode.G)) AddDebugGems(50);
+        if (Input.GetKeyDown(KeyCode.F1)) AddDebugGems(100);
+        if (Input.GetKeyDown(KeyCode.F2)) AddDebugGems(500);
+
+        if (isBuilderMode) return; // 建造模式由 TrackBuilderManager 掌管輸入
+
         // 快速重開鍵
         if (Input.GetKeyDown(KeyCode.R))
         {
@@ -107,6 +141,16 @@ public class RollingSkyGameManager : MonoBehaviour
 
         UpdateProgress();
         UpdateHardwareHUD();
+    }
+
+    public void AddDebugGems(int count)
+    {
+        int totalGems = PlayerPrefs.GetInt("TotalGems", 0) + count;
+        PlayerPrefs.SetInt("TotalGems", totalGems);
+        PlayerPrefs.Save();
+        collectedGems += count;
+        UpdateGemUI();
+        Debug.Log($"💎 [Debug] 寶石已增加 {count}！當前累計總寶石: {totalGems}");
     }
 
     // --- 暫停管理 (含自動容錯建立) ---
@@ -454,6 +498,12 @@ public class RollingSkyGameManager : MonoBehaviour
             {
                 int score = (int)Mathf.Max(0, currentDist) + (collectedGems * 50);
                 int bestScore = PlayerPrefs.GetInt("Endless_HighScore", 0);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    PlayerPrefs.SetInt("Endless_HighScore", bestScore);
+                    PlayerPrefs.Save();
+                }
                 if (score >= bestScore && score > 0)
                 {
                     AudioManager.Instance?.PlayHighscore();

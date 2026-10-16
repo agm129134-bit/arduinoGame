@@ -58,8 +58,8 @@ public class TrackBuilderManager : MonoBehaviour
     {
         if (!isEditMode)
         {
-            // 測試遊玩中按下 ESC 可隨時重返建造模式
-            if (Input.GetKeyDown(KeyCode.Escape))
+            // 測試遊玩中按下 ESC 可隨時重返建造模式；若小球墜落或死亡亦自動返回
+            if (Input.GetKeyDown(KeyCode.Escape) || (testBall != null && (testBall.IsDead || testBall.transform.position.y < -4f)))
             {
                 StopTestPlay();
             }
@@ -363,6 +363,8 @@ public class TrackBuilderManager : MonoBehaviour
     void ReturnToMenu()
     {
         SaveTrack();
+        PlayerPrefs.SetInt("IsBuilderMode", 0);
+        PlayerPrefs.Save();
         SceneManager.LoadScene("MainMenuScene");
     }
 
