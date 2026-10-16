@@ -626,18 +626,14 @@ public class RollingSkyMenuManager : MonoBehaviour
         Transform tResetSave = settingsPanel.transform.Find("Btn_ResetAllSave");
         if (tResetSave == null)
         {
-            GameObject bObj = CreateStyledButton(settingsPanel.transform, "Btn_ResetAllSave", "⚠️ 重置全部存檔 (RESET ALL SAVE)", new Vector2(0, -380), new Vector2(330, 65), 18, defaultFont);
-            Image img = bObj.GetComponent<Image>();
+            Button btnReset = CreateStyledButton(settingsPanel.transform, "Btn_ResetAllSave", "⚠️ 重置全部存檔 (RESET ALL SAVE)", new Vector2(0, -380), new Vector2(330, 65), 18, defaultFont);
+            Image img = btnReset.GetComponent<Image>();
             if (img != null) img.color = new Color(0.6f, 0.12f, 0.15f, 0.95f);
-            Button b = bObj.GetComponent<Button>();
-            if (b != null)
-            {
-                ColorBlock cb = b.colors;
-                cb.normalColor = new Color(0.6f, 0.15f, 0.18f);
-                cb.highlightedColor = new Color(0.9f, 0.2f, 0.25f);
-                cb.pressedColor = new Color(0.4f, 0.08f, 0.1f);
-                b.colors = cb;
-            }
+            ColorBlock cb = btnReset.colors;
+            cb.normalColor = new Color(0.6f, 0.15f, 0.18f);
+            cb.highlightedColor = new Color(0.9f, 0.2f, 0.25f);
+            cb.pressedColor = new Color(0.4f, 0.08f, 0.1f);
+            btnReset.colors = cb;
         }
         else
         {
