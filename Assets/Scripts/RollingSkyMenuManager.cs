@@ -58,7 +58,6 @@ public class RollingSkyMenuManager : MonoBehaviour
     public string gameSceneName = "RollingSkyScene";
 
     private GameObject currentActivePanel;
-    private bool isTransitioning = false;
     private bool isRebinding = false;
 
     // 暫存鍵位

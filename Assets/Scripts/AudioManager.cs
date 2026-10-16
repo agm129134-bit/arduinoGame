@@ -133,6 +133,8 @@ public class AudioManager : MonoBehaviour
         PlaySelectedBGM();
     }
 
+    public void PlayBgmTrack(int index) => SwitchBGM(index);
+
     public void StopBGM()
     {
         if (bgmSource != null) bgmSource.Stop();
@@ -146,6 +148,8 @@ public class AudioManager : MonoBehaviour
         PlayerPrefs.Save();
     }
 
+    public void SetBgmVolume(float volume) => SetBGMVolume(volume);
+
     public void SetSFXVolume(float volume)
     {
         volume = Mathf.Clamp01(volume);
@@ -153,6 +157,8 @@ public class AudioManager : MonoBehaviour
         PlayerPrefs.SetFloat("SFX_Volume", volume);
         PlayerPrefs.Save();
     }
+
+    public void SetSfxVolume(float volume) => SetSFXVolume(volume);
 
     public void PlayJump()
     {

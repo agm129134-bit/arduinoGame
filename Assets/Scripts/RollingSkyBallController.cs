@@ -249,5 +249,7 @@ public class RollingSkyBallController : MonoBehaviour
         }
     }
 
+    public bool CanJump() => !isDead && isGrounded;
+    public bool IsGrounded => isGrounded;
     public bool IsDead => isDead;
 }
