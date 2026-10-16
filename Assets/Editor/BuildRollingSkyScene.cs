@@ -82,14 +82,23 @@ public class BuildRollingSkyScene : Editor
         // 終點傳送星門 (Z=242)
         CreateFinishGate(trackRoot.transform, new Vector3(0, 1.5f, 242), matGoal);
 
-        // 散落收集寶石
-        CreateGem(trackRoot.transform, new Vector3(-colWidth, 1f, 14), matGem);
-        CreateGem(trackRoot.transform, new Vector3(colWidth, 1f, 26), matGem);
-        CreateGem(trackRoot.transform, new Vector3(0, 1.2f, 54), matGem);
+        // 散落收集寶石 (前三關寶石大量增加，共 22 顆)
+        for (int z = 10; z < 235; z += 10)
+        {
+            float gx = Mathf.Sin(z * 0.2f) * colWidth;
+            CreateGem(trackRoot.transform, new Vector3(gx, 1.0f, z), matGem);
+        }
         CreateGem(trackRoot.transform, new Vector3(0, 4.5f, 102), matGem); // 彈跳空中寶石
-        CreateGem(trackRoot.transform, new Vector3(0, 1f, 148), matGem);
-        CreateGem(trackRoot.transform, new Vector3(-colWidth, 1f, 202), matGem);
-        CreateGem(trackRoot.transform, new Vector3(colWidth, 1f, 230), matGem);
+
+        // 4.5. 添加全自動動態賽道與 10 關生成器
+        GameObject genObj = new GameObject("RollingSkyTrackGenerator");
+        RollingSkyTrackGenerator gen = genObj.AddComponent<RollingSkyTrackGenerator>();
+        gen.matTileDark = matTileDark;
+        gen.matTileCyan = matTileCyan;
+        gen.matHazard = matHazard;
+        gen.matJumpPad = matJumpPad;
+        gen.matGem = matGem;
+        gen.matGoal = matGoal;
 
         // 5. 建立小球主角
         GameObject ball = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -310,15 +319,12 @@ public class BuildRollingSkyScene : Editor
 
     static void CreateGem(Transform parent, Vector3 pos, Material mat)
     {
-        GameObject gem = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        gem.name = "Gem";
+        GameObject gem = new GameObject("Gem");
         gem.transform.SetParent(parent);
         gem.transform.position = pos;
-        gem.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
-        gem.GetComponent<MeshRenderer>().material = mat;
-        
-        SphereCollider sc = gem.GetComponent<SphereCollider>();
-        sc.isTrigger = true;
+        gem.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
+        MeshRenderer mr = gem.AddComponent<MeshRenderer>();
+        mr.material = mat;
         gem.AddComponent<GemCollectible>();
     }
 

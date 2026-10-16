@@ -21,6 +21,9 @@ public class AudioManager : MonoBehaviour
     public AudioClip sfxGem;
     public AudioClip sfxFall;
     public AudioClip sfxVictory;
+    public AudioClip sfxBuy;
+    public AudioClip sfxEquip;
+    public AudioClip sfxHighscore;
 
     [Header("BGM Selection (0: Cyber Neon, 1: Chiptune, 2: Deep Gravity)")]
     public int currentBgmIndex = 0;
@@ -78,6 +81,9 @@ public class AudioManager : MonoBehaviour
         yield return StartCoroutine(LoadClip(Path.Combine(audioDir, "sfx_gem.wav"), clip => sfxGem = clip));
         yield return StartCoroutine(LoadClip(Path.Combine(audioDir, "sfx_fall.wav"), clip => sfxFall = clip));
         yield return StartCoroutine(LoadClip(Path.Combine(audioDir, "sfx_victory.wav"), clip => sfxVictory = clip));
+        yield return StartCoroutine(LoadClip(Path.Combine(audioDir, "sfx_shop_buy.wav"), clip => sfxBuy = clip));
+        yield return StartCoroutine(LoadClip(Path.Combine(audioDir, "sfx_equip.wav"), clip => sfxEquip = clip));
+        yield return StartCoroutine(LoadClip(Path.Combine(audioDir, "sfx_highscore.wav"), clip => sfxHighscore = clip));
 
         // 載入完成後播放選定的 BGM
         PlaySelectedBGM();
@@ -167,5 +173,20 @@ public class AudioManager : MonoBehaviour
     {
         if (bgmSource != null) bgmSource.Stop();
         if (sfxSource != null && sfxVictory != null) sfxSource.PlayOneShot(sfxVictory, 1.0f);
+    }
+
+    public void PlayBuy()
+    {
+        if (sfxSource != null && sfxBuy != null) sfxSource.PlayOneShot(sfxBuy, 1.0f);
+    }
+
+    public void PlayEquip()
+    {
+        if (sfxSource != null && sfxEquip != null) sfxSource.PlayOneShot(sfxEquip, 1.0f);
+    }
+
+    public void PlayHighscore()
+    {
+        if (sfxSource != null && sfxHighscore != null) sfxSource.PlayOneShot(sfxHighscore, 1.0f);
     }
 }

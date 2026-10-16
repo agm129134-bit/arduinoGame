@@ -4,21 +4,28 @@
 
 ---
 
-## 🌟 遊戲核心特色
+## 🌟 遊戲核心特色與最新升級
 
-- **雙模態操控體系 (Dual Control Modes)**：
-  - 🕹️ **Arduino 實體感測模式**：
+- **🎮 多元豐富的遊玩模式**：
+  - **10 大特色漸進關卡 (10 Handcrafted Levels)**：
+    - 從 LV.1「霓虹大道」到 LV.10「終極躍動」，難度星級階梯式上升，包含高速衝刺、空中大跳躍、尖刺迷宮、浮島穿梭與極限鋼索道！
+  - **⚡ 無盡極限跑酷模式 (Endless Mode)**：
+    - 隨前進動態隨機生成未知路況，速度隨里程持續狂飆，挑戰個人極限與最高分紀錄！
+  - **🛠️ 自訂場地編輯器 (Track Builder Mode)**：
+    - 上帝俯視視角網格編輯，隨意鋪設賽道地磚、彈跳墊、尖刺陷阱與水晶，支援即時試玩與本地 JSON 儲存！
+  - **🛍️ 球體外觀商店 (Skin Shop)**：
+    - 5 款炫彩光效皮膚（經典電藍、霓虹烈焰、賽博矩陣、黃金至尊、銀河虛空），以關卡中收集的水晶解鎖並裝備！
+- **💎 璀璨 3D 多面體水晶寶石 (3D Crystal Diamond)**：
+  - 徹底告別單調球體！採用程序化生成的立體八面體寶石 Mesh，搭配高反光自發光霓虹材質與發光點光源，旋轉浮空閃耀。
+  - 前三關寶石數量翻倍（20~25 顆），沿路指引玩家走位，收集反饋感極佳！
+- **🕹️ 雙模態操控體系 (Dual Control Modes)**：
+  - **Arduino 實體感測模式**：
     - **ADXL345 三軸加速度計**：傾斜手把即時左右微調球體重心。
     - **HC-SR04 超音波距離感測器**：手掌上方懸空揮動隔空感應觸發大跳躍。
     - **雙軸類比搖桿**：方向與實體按鍵備援操控。
-  - ⌨️ **純鍵盤遊戲模式**：支援完整鍵位自訂（A/D 或 方向鍵左右轉向，Space 起跳，ESC 呼叫暫停選單）。
-- **豐富完整的多功能設定選單 (Settings Menu)**：
-  - **[ 鍵盤設定 KEYBOARD ]**：自訂左右移動按鍵、靈敏度滑桿（0.5x ~ 3.0x）即時存檔。
-  - **[ 控制器設定 CONTROLLER ]**：COM Port 序號選擇、傾角靈敏度、死區死角過濾、超音波起跳高度設定、實體訊號即時監控面板（Live Sensor Readout）。
-  - **[ 音訊設定 AUDIO ]**：3 種原創賽博龐克與復古晶片風背景音樂（Cyber Neon / Chiptune Rush / Deep Gravity）隨選即播、BGM 音量與 SFX 音效音量獨立調節。
-- **動態關卡與即時反饋**：
-  - 動態進度百分比儀表板、寶石收集進度、彈跳墊（Jump Pad）、致命障礙物（Hazard）、終點勝利結算。
-  - ESC 即時呼叫全域暫停選單（繼續遊戲、重新開始、返回主選單）。
+  - **純鍵盤遊戲模式**：支援完整鍵位自訂（A/D 或 方向鍵左右轉向，Space 起跳，ESC 呼叫暫停選單）。
+- **⚙️ 全新排版修復設定選單 (Settings Menu)**：
+  - 頂部分頁按鈕與底部操作按鈕全新排版，單行優雅顯示，支援鍵位重新綁定、硬體即時訊號監控面板與 3 種 BGM 音軌隨選即播。
 
 ---
 
@@ -55,24 +62,27 @@ arduinoGame/
 ├── Arduino/
 │   └── Arduino_Controller.ino      # 實體 Arduino 韌體程式 (感測器資料打包 20Hz 輸出)
 ├── Assets/
-│   ├── Audio/                      # 遊戲 44.1kHz WAV 音樂音效 (Cyber Neon, Chiptune Rush, Deep Gravity 等)
+│   ├── Audio/                      # 遊戲 44.1kHz WAV 音樂音效 (Cyber Neon, Chiptune Rush, Deep Gravity, SFX 等)
+│   │   └── preview.html            # 瀏覽器音訊試聽中心
 │   ├── Materials/                  # 賽道、霓虹、寶石、球體物理材質
 │   ├── Scenes/
-│   │   ├── MainMenuScene.unity     # 主選單與自訂控制/音訊設定介面場景
-│   │   └── RollingSkyScene.unity   # 3D 極速賽道主關卡場景
+│   │   ├── MainMenuScene.unity     # 主選單、10關選擇、皮膚商店與自訂設定場景
+│   │   └── RollingSkyScene.unity   # 3D 極速賽道主關卡與無盡跑酷場景
 │   └── Scripts/
-│       ├── ArduinoReceiver.cs      # 執行緒安全之序列埠通訊解析核心
-│       ├── AudioManager.cs         # 跨場景音訊管理器 (多版本 BGM、音效、音量持久化)
+│       ├── ArduinoReceiver.cs      # 序列埠通訊解析核心
+│       ├── AudioManager.cs         # 跨場景音訊管理器 (多版本 BGM、商店音效、音量持久化)
 │       ├── BuildMainMenuScene.cs   # 自動建置主選單與設定面板之編輯器工具
 │       ├── BuildRollingSkyScene.cs # 自動化關卡賽道生成工具
-│       ├── GemCollectible.cs       # 旋轉發光水晶收集機制
+│       ├── GemCollectible.cs       # 立體璀璨八面體水晶鑽石 Mesh 生成與發光收集機制
 │       ├── Hazard.cs               # 障礙物碰撞與失敗判定
 │       ├── JumpPad.cs              # 彈跳墊推力加速器
-│       ├── RollingSkyBallController.cs # 3D 物理球體運動、鍵盤與傾角雙模融合控制
+│       ├── RollingSkyBallController.cs # 3D 物理球體運動、皮膚更換、鍵盤與傾角雙模融合控制
 │       ├── RollingSkyCamera.cs     # 第三人生平滑追蹤相機
-│       ├── RollingSkyGameManager.cs# 遊戲核心邏輯 (百分比進度、寶石計數、ESC 暫停)
+│       ├── RollingSkyGameManager.cs# 遊戲核心邏輯 (進度、計分、無盡模式、ESC 暫停)
 │       ├── RollingSkyJumpDetector.cs   # 超音波手勢跳躍辨識演算法
-│       └── RollingSkyMenuManager.cs# 三分頁設定選單、即時鍵位監聽、音訊選單邏輯
+│       ├── RollingSkyMenuManager.cs# 主選單、10關網格、外觀商店、設定排版邏輯
+│       ├── RollingSkyTrackGenerator.cs # 10 大特色關卡動態生成器與無盡跑酷動態區塊系統
+│       └── TrackBuilderManager.cs  # 自訂場地編輯器 (網格編輯/存檔/試玩)
 ├── Packages/
 │   └── manifest.json               # Unity 套件清單
 └── ProjectSettings/                # 專案全域設定 (Input, Tags, Physics, Quality)

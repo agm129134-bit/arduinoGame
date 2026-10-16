@@ -28,6 +28,7 @@ public class RollingSkyGameManager : MonoBehaviour
     private bool isGameOver = false;
     private bool isVictory = false;
     private bool isPaused = false;
+    private bool isEndlessMode = false;
 
     private ArduinoReceiver arduino;
 
@@ -39,6 +40,8 @@ public class RollingSkyGameManager : MonoBehaviour
 
     void Start()
     {
+        isEndlessMode = (PlayerPrefs.GetInt("IsEndlessMode", 0) == 1);
+
         if (ball == null)
         {
             RollingSkyBallController bc = FindAnyObjectByType<RollingSkyBallController>();
@@ -50,12 +53,30 @@ public class RollingSkyGameManager : MonoBehaviour
         arduino = FindAnyObjectByType<ArduinoReceiver>();
         totalGemsInLevel = FindObjectsByType<GemCollectible>(FindObjectsSortMode.None).Length;
 
-        // 【Runtime 自癒架構】：即使玩家沒有透過 Editor 重新生成場景，程式碼也會全自動補全 EventSystem 與 PausePanel
+        // 【Runtime 自癒架構】：全自動補全 EventSystem、PausePanel 與 TrackGenerator
         EnsureAllUI();
+        EnsureTrackGenerator();
 
         // 綁定所有面板按鈕事件
         BindAllButtonsRuntime();
 
+        UpdateGemUI();
+    }
+
+    void EnsureTrackGenerator()
+    {
+        if (FindAnyObjectByType<RollingSkyTrackGenerator>() == null)
+        {
+            GameObject genObj = new GameObject("RollingSkyTrackGenerator");
+            genObj.AddComponent<RollingSkyTrackGenerator>();
+        }
+    }
+
+    public void ResetLevelStats()
+    {
+        collectedGems = 0;
+        totalGemsInLevel = FindObjectsByType<GemCollectible>(FindObjectsSortMode.None).Length;
+        if (ball != null) startZ = ball.position.z;
         UpdateGemUI();
     }
 
@@ -93,7 +114,6 @@ public class RollingSkyGameManager : MonoBehaviour
     {
         if (isGameOver || isVictory) return;
 
-        // 若尚未獲取 pausePanel 則進行即時自癒建立
         if (pausePanel == null)
         {
             EnsureAllUI();
@@ -105,7 +125,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (pausePanel != null)
         {
-            pausePanel.transform.SetAsLastSibling(); // 確保置於 UI 最頂層
+            pausePanel.transform.SetAsLastSibling();
             pausePanel.SetActive(isPaused);
         }
 
@@ -135,7 +155,6 @@ public class RollingSkyGameManager : MonoBehaviour
     // --- Runtime UI 自癒與防禦性初始化 ---
     void EnsureAllUI()
     {
-        // 1. 確保實體 EventSystem 存在 (保證 UI 點擊射線能正常傳遞)
         if (UnityEngine.EventSystems.EventSystem.current == null)
         {
             GameObject esObj = new GameObject("EventSystem");
@@ -143,14 +162,12 @@ public class RollingSkyGameManager : MonoBehaviour
             esObj.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
         }
 
-        // 1.5. 確保 AudioManager 存在 (全域管理背景音樂與動作音效)
         if (AudioManager.Instance == null && FindAnyObjectByType<AudioManager>() == null)
         {
             GameObject audioObj = new GameObject("AudioManager");
             audioObj.AddComponent<AudioManager>();
         }
 
-        // 2. 尋找或建立 Canvas
         Canvas canvas = FindAnyObjectByType<Canvas>();
         if (canvas == null)
         {
@@ -171,7 +188,6 @@ public class RollingSkyGameManager : MonoBehaviour
         Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         if (defaultFont == null) defaultFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-        // 3. 尋找或動態建立 PausePanel
         if (pausePanel == null)
         {
             Transform pTransform = canvas.transform.Find("PausePanel");
@@ -191,7 +207,6 @@ public class RollingSkyGameManager : MonoBehaviour
             pausePanel.SetActive(false);
         }
 
-        // 4. 補強 GameOverPanel 與 VictoryPanel 按鈕
         EnsurePanelButtons(gameOverPanel, defaultFont);
         EnsurePanelButtons(victoryPanel, defaultFont);
 
@@ -206,18 +221,16 @@ public class RollingSkyGameManager : MonoBehaviour
 
         Image img = panel.AddComponent<Image>();
         img.color = new Color(0.04f, 0.06f, 0.12f, 0.92f);
-        img.raycastTarget = true; // 阻擋下方穿透
+        img.raycastTarget = true;
 
         RectTransform rt = panel.GetComponent<RectTransform>();
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
         rt.sizeDelta = Vector2.zero;
 
-        // 標題與提示文字
         CreateText(panel.transform, "Title", "遊戲暫停 PAUSED", 56, new Color(0f, 1f, 0.9f), new Vector2(0, 160), new Vector2(800, 80), font, FontStyle.Bold);
         CreateText(panel.transform, "Hint", "💡 提示：再次按下 [ESC] 鍵可直接繼續遊戲", 24, new Color(0.4f, 0.9f, 1f), new Vector2(0, 95), new Vector2(800, 60), font, FontStyle.Normal);
 
-        // 三大按鈕
         CreateStyledButton(panel.transform, "Btn_Resume", "▶ 繼續遊戲 (RESUME)", new Vector2(0, 15), new Vector2(440, 65), 30, font);
         CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新挑戰 (RESTART)", new Vector2(0, -65), new Vector2(440, 65), 30, font);
         CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回到主選單 (MAIN MENU)", new Vector2(0, -145), new Vector2(440, 65), 30, font);
@@ -228,15 +241,17 @@ public class RollingSkyGameManager : MonoBehaviour
     void EnsurePanelButtons(GameObject panel, Font font)
     {
         if (panel == null) return;
+        Transform tResume = panel.transform.Find("Btn_Resume");
+        Transform tRestart = panel.transform.Find("Btn_Restart");
+        Transform tMainMenu = panel.transform.Find("Btn_MainMenu");
 
-        if (panel.transform.Find("Btn_Restart") == null)
+        if (tRestart == null)
         {
-            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新挑戰 (RETRY)", new Vector2(0, -60), new Vector2(440, 65), 30, font);
+            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -60), new Vector2(400, 65), 28, font);
         }
-
-        if (panel.transform.Find("Btn_MainMenu") == null)
+        if (tMainMenu == null)
         {
-            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回到主選單 (MAIN MENU)", new Vector2(0, -140), new Vector2(440, 65), 30, font);
+            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -140), new Vector2(400, 65), 28, font);
         }
     }
 
@@ -270,6 +285,8 @@ public class RollingSkyGameManager : MonoBehaviour
         t.alignment = TextAnchor.MiddleCenter;
         t.text = label;
         t.raycastTarget = false;
+        t.horizontalOverflow = HorizontalWrapMode.Overflow;
+        t.verticalOverflow = VerticalWrapMode.Overflow;
 
         RectTransform trt = tObj.GetComponent<RectTransform>();
         trt.anchorMin = Vector2.zero;
@@ -295,6 +312,8 @@ public class RollingSkyGameManager : MonoBehaviour
         t.alignment = TextAnchor.MiddleCenter;
         t.text = content;
         t.raycastTarget = false;
+        t.horizontalOverflow = HorizontalWrapMode.Overflow;
+        t.verticalOverflow = VerticalWrapMode.Overflow;
 
         RectTransform rt = obj.GetComponent<RectTransform>();
         rt.anchoredPosition = pos;
@@ -307,7 +326,6 @@ public class RollingSkyGameManager : MonoBehaviour
         return t;
     }
 
-    // --- 動態按鈕綁定 ---
     void BindAllButtonsRuntime()
     {
         if (pausePanel != null)
@@ -350,16 +368,35 @@ public class RollingSkyGameManager : MonoBehaviour
         if (ball == null) return;
 
         float currentDist = ball.position.z - startZ;
-        float ratio = Mathf.Clamp01(currentDist / trackLength);
-        float percent = ratio * 100f;
 
-        if (progressBar != null) progressBar.value = ratio;
-        if (progressText != null) progressText.text = $"{percent:F0}%";
-
-        // 終點判定
-        if (ratio >= 0.999f)
+        if (isEndlessMode)
         {
-            TriggerVictory();
+            // 無盡模式計分：前進米數 + 水晶收集額外分數
+            int score = (int)Mathf.Max(0, currentDist) + (collectedGems * 50);
+            int bestScore = PlayerPrefs.GetInt("Endless_HighScore", 0);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                PlayerPrefs.SetInt("Endless_HighScore", bestScore);
+                PlayerPrefs.Save();
+            }
+
+            if (progressText != null) progressText.text = $"⚡ 得分: {score}  |  🏆 最佳: {bestScore}";
+            if (progressBar != null) progressBar.value = Mathf.PingPong(currentDist / 80f, 1.0f);
+        }
+        else
+        {
+            float ratio = Mathf.Clamp01(currentDist / trackLength);
+            float percent = ratio * 100f;
+
+            if (progressBar != null) progressBar.value = ratio;
+            if (progressText != null) progressText.text = $"{percent:F0}%";
+
+            // 終點判定
+            if (ratio >= 0.999f)
+            {
+                TriggerVictory();
+            }
         }
     }
 
@@ -369,11 +406,11 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (arduino != null && arduino.distance > 0)
         {
-            hardwareStatusText.text = $"超音波測距: <color=yellow>{arduino.distance:F1} cm</color> (上下揮動跳躍) | 傾斜感應: <color=cyan>{arduino.acceleration.x:F2}</color> | <color=white>[ESC: 暫停選單]</color>";
+            hardwareStatusText.text = $"超音波測距: <color=yellow>{arduino.distance:F1} cm</color> (揮手跳躍) | 傾斜感應: <color=cyan>{arduino.acceleration.x:F2}</color> | <color=white>[ESC: 暫停選單]</color>";
         }
         else
         {
-            hardwareStatusText.text = "鍵盤測試模式: [A/D: 左右移] | [Space: 跳躍] | [R: 重試] | <color=cyan>[ESC: 暫停 / 回到選單]</color>";
+            hardwareStatusText.text = "鍵盤操作模式: [A/D: 左右移] | [Space: 跳躍] | [R: 重試] | <color=cyan>[ESC: 暫停 / 回到選單]</color>";
         }
     }
 
@@ -387,7 +424,14 @@ public class RollingSkyGameManager : MonoBehaviour
     {
         if (gemText != null)
         {
-            gemText.text = $"💎 {collectedGems} / {totalGemsInLevel}";
+            if (isEndlessMode)
+            {
+                gemText.text = $"💎 已收集: {collectedGems}";
+            }
+            else
+            {
+                gemText.text = $"💎 {collectedGems} / {totalGemsInLevel}";
+            }
         }
     }
 
@@ -399,17 +443,34 @@ public class RollingSkyGameManager : MonoBehaviour
         if (pausePanel != null) pausePanel.SetActive(false);
 
         float currentDist = (ball != null) ? ball.position.z - startZ : 0f;
-        float percent = Mathf.Clamp01(currentDist / trackLength) * 100f;
 
         if (gameOverPanel != null)
         {
             gameOverPanel.transform.SetAsLastSibling();
             gameOverPanel.SetActive(true);
             if (gameOverReasonText != null) gameOverReasonText.text = reason;
-            if (gameOverProgressText != null) gameOverProgressText.text = $"完成度: {percent:F0}%";
+
+            if (isEndlessMode)
+            {
+                int score = (int)Mathf.Max(0, currentDist) + (collectedGems * 50);
+                int bestScore = PlayerPrefs.GetInt("Endless_HighScore", 0);
+                if (score >= bestScore && score > 0)
+                {
+                    AudioManager.Instance?.PlayHighscore();
+                }
+                if (gameOverProgressText != null)
+                {
+                    gameOverProgressText.text = $"無盡跑酷得分: {score} 分 (歷史最佳: {bestScore} 分)";
+                }
+            }
+            else
+            {
+                float percent = Mathf.Clamp01(currentDist / trackLength) * 100f;
+                if (gameOverProgressText != null) gameOverProgressText.text = $"完成度: {percent:F0}%";
+            }
         }
 
-        Debug.Log($"[GameManager] Game Over! {reason} (完成度: {percent:F0}%)");
+        Debug.Log($"[GameManager] Game Over! {reason}");
     }
 
     public void TriggerVictory()
@@ -419,14 +480,18 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (pausePanel != null) pausePanel.SetActive(false);
 
+        // 標記本關卡已通關
+        int currentLevel = PlayerPrefs.GetInt("SelectedLevel", 1);
+        PlayerPrefs.SetInt($"Level_{currentLevel}_Completed", 1);
+        PlayerPrefs.Save();
+
         if (victoryPanel != null)
         {
-            // 動態更新勝利面板文字（將「滾動的天空」換成新原創遊戲名稱）
             Transform subT = victoryPanel.transform.Find("Sub");
             if (subT != null)
             {
                 Text t = subT.GetComponent<Text>();
-                if (t != null) t.text = "你成功征服了《極速躍動 3D (Rolling Leap)》賽博賽道！";
+                if (t != null) t.text = $"恭喜征服第 {currentLevel} 關！晶彩跳躍，勢不可擋！";
             }
 
             victoryPanel.transform.SetAsLastSibling();
@@ -434,6 +499,6 @@ public class RollingSkyGameManager : MonoBehaviour
         }
 
         AudioManager.Instance?.PlayVictory();
-        Debug.Log("[GameManager] 🎉 100% 完美通關《極速躍動 3D (Rolling Leap)》賽博賽道！");
+        Debug.Log($"[GameManager] 🎉 100% 完美通關第 {currentLevel} 關！");
     }
 }
