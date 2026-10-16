@@ -15,6 +15,7 @@ public class GemCollectible : MonoBehaviour
     {
         // 升級視覺模型：以程式碼動態生成立體多面體璀璨水晶 (Faceted Crystal / Octahedron Diamond)
         EnsureCrystalMesh();
+        EnsureRendererAndMaterial();
         EnsureSparkleLight();
     }
 
@@ -92,6 +93,26 @@ public class GemCollectible : MonoBehaviour
         tris[vIdx] = vIdx;
         tris[vIdx + 1] = vIdx + 1;
         tris[vIdx + 2] = vIdx + 2;
+    }
+
+    /// <summary>
+    /// 自動為寶石物件掛載渲染器與璀璨發光材質，杜絕白方塊或缺材質情況
+    /// </summary>
+    void EnsureRendererAndMaterial()
+    {
+        MeshRenderer mr = GetComponent<MeshRenderer>();
+        if (mr == null) mr = gameObject.AddComponent<MeshRenderer>();
+        if (mr.sharedMaterial == null)
+        {
+            Material mat = new Material(Shader.Find("Standard"));
+            mat.name = "Mat_DynamicGem";
+            mat.color = new Color(0.15f, 0.95f, 1f, 0.95f);
+            mat.SetColor("_EmissionColor", new Color(0.2f, 1.1f, 1.4f));
+            mat.EnableKeyword("_EMISSION");
+            mat.SetFloat("_Glossiness", 0.95f);
+            mat.SetFloat("_Metallic", 0.4f);
+            mr.material = mat;
+        }
     }
 
     /// <summary>

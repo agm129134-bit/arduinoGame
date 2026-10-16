@@ -25,6 +25,13 @@ public class TrackBuilderManager : MonoBehaviour
     private Camera mainCamera;
     private RollingSkyBallController testBall;
 
+    [Header("Visual Materials")]
+    private Material matTileDark;
+    private Material matTileCyan;
+    private Material matHazard;
+    private Material matJumpPad;
+    private Material matGem;
+
     [Header("UI References")]
     public GameObject builderUIPanel;
     public Text infoText;
@@ -34,9 +41,64 @@ public class TrackBuilderManager : MonoBehaviour
         Instance = this;
     }
 
+    void EnsureMaterials()
+    {
+        if (RollingSkyTrackGenerator.Instance != null)
+        {
+            matTileDark = RollingSkyTrackGenerator.Instance.matTileDark;
+            matTileCyan = RollingSkyTrackGenerator.Instance.matTileCyan;
+            matHazard = RollingSkyTrackGenerator.Instance.matHazard;
+            matJumpPad = RollingSkyTrackGenerator.Instance.matJumpPad;
+            matGem = RollingSkyTrackGenerator.Instance.matGem;
+        }
+
+        if (matTileDark == null)
+        {
+            matTileDark = new Material(Shader.Find("Standard"));
+            matTileDark.color = new Color(0.08f, 0.12f, 0.22f);
+            matTileDark.SetFloat("_Glossiness", 0.7f);
+        }
+        if (matTileCyan == null)
+        {
+            matTileCyan = new Material(Shader.Find("Standard"));
+            matTileCyan.color = new Color(0f, 0.75f, 1f);
+            matTileCyan.SetFloat("_Glossiness", 0.7f);
+        }
+        if (matHazard == null)
+        {
+            matHazard = new Material(Shader.Find("Standard"));
+            matHazard.color = new Color(1f, 0.15f, 0.15f);
+            matHazard.SetColor("_EmissionColor", new Color(1.2f, 0.1f, 0.1f));
+            matHazard.EnableKeyword("_EMISSION");
+            matHazard.SetFloat("_Glossiness", 0.8f);
+        }
+        if (matJumpPad == null)
+        {
+            matJumpPad = new Material(Shader.Find("Standard"));
+            matJumpPad.color = new Color(0.1f, 1f, 0.4f);
+            matJumpPad.SetColor("_EmissionColor", new Color(0.2f, 1.3f, 0.4f));
+            matJumpPad.EnableKeyword("_EMISSION");
+            matJumpPad.SetFloat("_Glossiness", 0.8f);
+        }
+        if (matGem == null)
+        {
+            matGem = new Material(Shader.Find("Standard"));
+            matGem.color = new Color(0.2f, 0.95f, 1f, 0.9f);
+            matGem.SetColor("_EmissionColor", new Color(0.3f, 1.2f, 1.5f));
+            matGem.EnableKeyword("_EMISSION");
+            matGem.SetFloat("_Glossiness", 0.95f);
+        }
+    }
+
     void Start()
     {
+        EnsureMaterials();
         mainCamera = Camera.main;
+        if (mainCamera != null)
+        {
+            RollingSkyCamera camCtrl = mainCamera.GetComponent<RollingSkyCamera>();
+            if (camCtrl != null) camCtrl.enabled = false;
+        }
 
         // 預設填入前 5 排地磚作為起跑台
         for (int r = 0; r < 5; r++)
@@ -51,7 +113,7 @@ public class TrackBuilderManager : MonoBehaviour
         CreateVisualGrid();
         CreateCursor();
         BuildUI();
-        UpdateCameraView();
+        SnapCameraToCursor();
     }
 
     void Update()
@@ -72,6 +134,11 @@ public class TrackBuilderManager : MonoBehaviour
 
         HandleInput();
         UpdateCursorTransform();
+    }
+
+    void LateUpdate()
+    {
+        if (!isEditMode || mainCamera == null) return;
         UpdateCameraView();
     }
 
@@ -133,12 +200,20 @@ public class TrackBuilderManager : MonoBehaviour
         }
     }
 
+    public void SnapCameraToCursor()
+    {
+        if (mainCamera == null) return;
+        Vector3 targetCamPos = new Vector3(cursorCol * COL_WIDTH * 0.35f, 13.5f, (cursorRow * ROW_LEN) - 8.5f);
+        mainCamera.transform.position = targetCamPos;
+        mainCamera.transform.rotation = Quaternion.Euler(52f, 0f, 0f);
+    }
+
     void UpdateCameraView()
     {
         if (mainCamera == null || !isEditMode) return;
-        Vector3 targetCamPos = new Vector3(cursorCol * COL_WIDTH * 0.4f, 12.0f, (cursorRow * ROW_LEN) - 10.0f);
-        mainCamera.transform.position = Vector3.Lerp(mainCamera.transform.position, targetCamPos, Time.deltaTime * 6f);
-        mainCamera.transform.rotation = Quaternion.Euler(50f, 0f, 0f);
+        Vector3 targetCamPos = new Vector3(cursorCol * COL_WIDTH * 0.35f, 13.5f, (cursorRow * ROW_LEN) - 8.5f);
+        mainCamera.transform.position = Vector3.Lerp(mainCamera.transform.position, targetCamPos, Time.unscaledDeltaTime * 10f);
+        mainCamera.transform.rotation = Quaternion.Euler(52f, 0f, 0f);
     }
 
     void CreateVisualGrid()
@@ -158,51 +233,71 @@ public class TrackBuilderManager : MonoBehaviour
         if (visualObjects[cIdx, row] != null)
         {
             Destroy(visualObjects[cIdx, row]);
+            visualObjects[cIdx, row] = null;
         }
 
         int type = grid[cIdx, row];
         if (type == 0) return;
 
-        GameObject obj = null;
+        // 建立單元複合根物件
+        GameObject cellObj = new GameObject($"Cell_{col}_{row}");
+        cellObj.transform.SetParent(transform);
+
+        // 1. 基礎跑道地磚 (所有機關皆座落於標準地磚上，呈現交替色賽博霓虹質感)
+        GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        tile.name = "Tile";
+        tile.transform.SetParent(cellObj.transform);
+        tile.transform.position = new Vector3(col * COL_WIDTH, 0, row * ROW_LEN);
+        tile.transform.localScale = new Vector3(COL_WIDTH * 0.96f, 0.4f, ROW_LEN * 0.96f);
+
+        bool isAlt = (Mathf.Abs(col) + row) % 2 == 0;
+        tile.GetComponent<MeshRenderer>().material = isAlt ? matTileDark : matTileCyan;
+
         Vector3 pos = new Vector3(col * COL_WIDTH, 0, row * ROW_LEN);
 
+        // 2. 依類型附加對應特徵物件與鮮明材質
         switch (type)
         {
-            case 1: // 普通磚
-                obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                obj.transform.position = pos;
-                obj.transform.localScale = new Vector3(COL_WIDTH * 0.95f, 0.4f, ROW_LEN * 0.95f);
+            case 1: // 普通磚 (已具備基礎地磚)
                 break;
-            case 2: // 彈跳墊
-                obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                obj.transform.position = new Vector3(pos.x, 0.1f, pos.z);
-                obj.transform.localScale = new Vector3(COL_WIDTH * 0.9f, 0.3f, ROW_LEN * 0.9f);
-                BoxCollider jbc = obj.GetComponent<BoxCollider>();
+
+            case 2: // 彈跳墊 (翠綠發光跳台)
+                GameObject pad = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                pad.name = "JumpPad";
+                pad.transform.SetParent(cellObj.transform);
+                pad.transform.position = new Vector3(pos.x, 0.22f, pos.z);
+                pad.transform.localScale = new Vector3(COL_WIDTH * 0.88f, 0.16f, ROW_LEN * 0.88f);
+                pad.GetComponent<MeshRenderer>().material = matJumpPad;
+                BoxCollider jbc = pad.GetComponent<BoxCollider>();
                 if (jbc != null) jbc.isTrigger = true;
-                obj.AddComponent<JumpPad>();
+                pad.AddComponent<JumpPad>();
                 break;
-            case 3: // 尖刺
-                obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                obj.transform.position = new Vector3(pos.x, 0.5f, pos.z);
-                obj.transform.localScale = new Vector3(1.3f, 1.0f, 1.3f);
-                obj.AddComponent<Hazard>();
+
+            case 3: // 尖刺障礙 (赤紅發光致命尖刺)
+                GameObject haz = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                haz.name = "Hazard";
+                haz.transform.SetParent(cellObj.transform);
+                haz.transform.position = new Vector3(pos.x, 0.6f, pos.z);
+                haz.transform.localScale = new Vector3(1.35f, 1.0f, 1.35f);
+                haz.GetComponent<MeshRenderer>().material = matHazard;
+                haz.AddComponent<Hazard>();
                 break;
-            case 4: // 寶石
-                obj = new GameObject("Gem");
-                obj.transform.position = new Vector3(pos.x, 0.8f, pos.z);
-                obj.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
-                SphereCollider gsc = obj.AddComponent<SphereCollider>();
+
+            case 4: // 水晶寶石 (璀璨旋轉鑽石模型)
+                GameObject gem = new GameObject("Gem");
+                gem.transform.SetParent(cellObj.transform);
+                gem.transform.position = new Vector3(pos.x, 0.85f, pos.z);
+                gem.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
+                SphereCollider gsc = gem.AddComponent<SphereCollider>();
                 gsc.isTrigger = true;
-                gsc.radius = 0.8f;
-                obj.AddComponent<GemCollectible>();
+                gsc.radius = 0.6f;
+                MeshRenderer gmr = gem.AddComponent<MeshRenderer>();
+                gmr.material = matGem;
+                gem.AddComponent<GemCollectible>();
                 break;
         }
 
-        if (obj != null)
-        {
-            obj.transform.SetParent(transform);
-            visualObjects[cIdx, row] = obj;
-        }
+        visualObjects[cIdx, row] = cellObj;
     }
 
     public void SaveTrack()
@@ -265,10 +360,14 @@ public class TrackBuilderManager : MonoBehaviour
         bObj.AddComponent<Rigidbody>();
         testBall = bObj.AddComponent<RollingSkyBallController>();
 
-        // 綁定攝影機跟隨
-        RollingSkyCamera camCtrl = mainCamera.GetComponent<RollingSkyCamera>();
-        if (camCtrl == null) camCtrl = mainCamera.gameObject.AddComponent<RollingSkyCamera>();
-        camCtrl.target = bObj.transform;
+        // 啟用攝影機跟隨小球
+        if (mainCamera != null)
+        {
+            RollingSkyCamera camCtrl = mainCamera.GetComponent<RollingSkyCamera>();
+            if (camCtrl == null) camCtrl = mainCamera.gameObject.AddComponent<RollingSkyCamera>();
+            camCtrl.enabled = true;
+            camCtrl.target = bObj.transform;
+        }
     }
 
     public void OnTestBallDied(string reason)
@@ -295,10 +394,17 @@ public class TrackBuilderManager : MonoBehaviour
             testBall = null;
         }
 
-        RollingSkyCamera camCtrl = mainCamera.GetComponent<RollingSkyCamera>();
-        if (camCtrl != null) Destroy(camCtrl);
+        if (mainCamera != null)
+        {
+            RollingSkyCamera camCtrl = mainCamera.GetComponent<RollingSkyCamera>();
+            if (camCtrl != null)
+            {
+                camCtrl.enabled = false;
+                camCtrl.target = null;
+            }
+        }
 
-        UpdateCameraView();
+        SnapCameraToCursor();
     }
 
     void BuildUI()

@@ -23,7 +23,7 @@ public class RollingSkyCamera : MonoBehaviour
 
     void LateUpdate()
     {
-        if (target == null) return;
+        if (target == null || !target.gameObject.activeInHierarchy) return;
 
         // 平滑追蹤 X 軸 (避免左右晃動過劇)
         currentX = Mathf.Lerp(currentX, target.position.x, smoothSpeedX * Time.deltaTime);
