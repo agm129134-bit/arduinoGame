@@ -511,16 +511,91 @@ public class RollingSkyGameManager : MonoBehaviour
     void EnsureGameOverPanelButtons(GameObject panel, Font font)
     {
         if (panel == null) return;
+
+        // 重構並重置死亡面板標題與完成度座標，徹底杜絕文本與按鈕相互重疊
+        Transform tReason = panel.transform.Find("Reason");
+        if (tReason != null)
+        {
+            RectTransform rtReason = tReason.GetComponent<RectTransform>();
+            if (rtReason != null)
+            {
+                rtReason.anchoredPosition = new Vector2(0, 140);
+                rtReason.sizeDelta = new Vector2(850, 60);
+            }
+            Text txtReason = tReason.GetComponent<Text>();
+            if (txtReason != null)
+            {
+                txtReason.fontSize = 44;
+                txtReason.fontStyle = FontStyle.Bold;
+                txtReason.alignment = TextAnchor.MiddleCenter;
+                txtReason.horizontalOverflow = HorizontalWrapMode.Wrap;
+                txtReason.verticalOverflow = VerticalWrapMode.Overflow;
+                txtReason.color = Color.white;
+            }
+        }
+
+        Transform tProg = panel.transform.Find("Progress");
+        if (tProg != null)
+        {
+            RectTransform rtProg = tProg.GetComponent<RectTransform>();
+            if (rtProg != null)
+            {
+                rtProg.anchoredPosition = new Vector2(0, 60);
+                rtProg.sizeDelta = new Vector2(850, 50);
+            }
+            Text txtProg = tProg.GetComponent<Text>();
+            if (txtProg != null)
+            {
+                txtProg.fontSize = 34;
+                txtProg.fontStyle = FontStyle.Bold;
+                txtProg.alignment = TextAnchor.MiddleCenter;
+                txtProg.horizontalOverflow = HorizontalWrapMode.Wrap;
+                txtProg.verticalOverflow = VerticalWrapMode.Overflow;
+                txtProg.color = Color.yellow;
+            }
+        }
+
+        Transform tHint = panel.transform.Find("Hint");
+        if (tHint != null)
+        {
+            RectTransform rtHint = tHint.GetComponent<RectTransform>();
+            if (rtHint != null)
+            {
+                rtHint.anchoredPosition = new Vector2(0, 5);
+                rtHint.sizeDelta = new Vector2(850, 40);
+            }
+            Text txtHint = tHint.GetComponent<Text>();
+            if (txtHint != null)
+            {
+                txtHint.fontSize = 22;
+                txtHint.alignment = TextAnchor.MiddleCenter;
+                txtHint.horizontalOverflow = HorizontalWrapMode.Wrap;
+                txtHint.verticalOverflow = VerticalWrapMode.Overflow;
+                txtHint.color = new Color(0.85f, 0.85f, 0.85f, 0.85f);
+            }
+        }
+
         Transform tRestart = panel.transform.Find("Btn_Restart");
         Transform tMainMenu = panel.transform.Find("Btn_MainMenu");
 
         if (tRestart == null)
         {
-            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -60), new Vector2(400, 65), 28, font);
+            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -65), new Vector2(440, 60), 28, font);
         }
+        else
+        {
+            RectTransform rt = tRestart.GetComponent<RectTransform>();
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -65); rt.sizeDelta = new Vector2(440, 60); }
+        }
+
         if (tMainMenu == null)
         {
-            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -140), new Vector2(400, 65), 28, font);
+            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -140), new Vector2(440, 60), 28, font);
+        }
+        else
+        {
+            RectTransform rt = tMainMenu.GetComponent<RectTransform>();
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -140); rt.sizeDelta = new Vector2(440, 60); }
         }
     }
 
@@ -536,7 +611,15 @@ public class RollingSkyGameManager : MonoBehaviour
             if (rtTitle != null)
             {
                 rtTitle.anchoredPosition = new Vector2(0, 160);
-                rtTitle.sizeDelta = new Vector2(800, 70);
+                rtTitle.sizeDelta = new Vector2(900, 65);
+            }
+            Text txtTitle = tTitle.GetComponent<Text>();
+            if (txtTitle != null)
+            {
+                txtTitle.fontSize = 52;
+                txtTitle.fontStyle = FontStyle.Bold;
+                txtTitle.alignment = TextAnchor.MiddleCenter;
+                txtTitle.color = Color.yellow;
             }
         }
 
@@ -546,8 +629,37 @@ public class RollingSkyGameManager : MonoBehaviour
             RectTransform rtSub = tSub.GetComponent<RectTransform>();
             if (rtSub != null)
             {
-                rtSub.anchoredPosition = new Vector2(0, 90);
-                rtSub.sizeDelta = new Vector2(850, 50);
+                rtSub.anchoredPosition = new Vector2(0, 80);
+                rtSub.sizeDelta = new Vector2(1000, 75);
+            }
+            Text txtSub = tSub.GetComponent<Text>();
+            if (txtSub != null)
+            {
+                txtSub.fontSize = 26;
+                txtSub.fontStyle = FontStyle.Bold;
+                txtSub.alignment = TextAnchor.MiddleCenter;
+                txtSub.horizontalOverflow = HorizontalWrapMode.Wrap;
+                txtSub.verticalOverflow = VerticalWrapMode.Overflow;
+                txtSub.lineSpacing = 1.15f;
+                txtSub.color = Color.white;
+            }
+        }
+
+        Transform tHint = panel.transform.Find("Hint");
+        if (tHint != null)
+        {
+            RectTransform rtHint = tHint.GetComponent<RectTransform>();
+            if (rtHint != null)
+            {
+                rtHint.anchoredPosition = new Vector2(0, 20);
+                rtHint.sizeDelta = new Vector2(850, 35);
+            }
+            Text txtHint = tHint.GetComponent<Text>();
+            if (txtHint != null)
+            {
+                txtHint.fontSize = 20;
+                txtHint.alignment = TextAnchor.MiddleCenter;
+                txtHint.color = new Color(0.85f, 0.85f, 0.85f, 0.75f);
             }
         }
 
@@ -557,32 +669,32 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (tNext == null)
         {
-            CreateStyledButton(panel.transform, "Btn_NextLevel", "⏩ 前往下一關 (NEXT LEVEL)", new Vector2(0, 15), new Vector2(440, 58), 26, font);
+            CreateStyledButton(panel.transform, "Btn_NextLevel", "⏩ 前往下一關 (NEXT LEVEL)", new Vector2(0, 10), new Vector2(440, 56), 26, font);
         }
         else
         {
             RectTransform rt = tNext.GetComponent<RectTransform>();
-            if (rt != null) { rt.anchoredPosition = new Vector2(0, 15); rt.sizeDelta = new Vector2(440, 58); }
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, 10); rt.sizeDelta = new Vector2(440, 56); }
         }
 
         if (tRestart == null)
         {
-            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -55), new Vector2(440, 58), 26, font);
+            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -55), new Vector2(440, 56), 26, font);
         }
         else
         {
             RectTransform rt = tRestart.GetComponent<RectTransform>();
-            if (rt != null) { rt.anchoredPosition = new Vector2(0, -55); rt.sizeDelta = new Vector2(440, 58); }
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -55); rt.sizeDelta = new Vector2(440, 56); }
         }
 
         if (tMainMenu == null)
         {
-            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -125), new Vector2(440, 58), 26, font);
+            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -125), new Vector2(440, 56), 26, font);
         }
         else
         {
             RectTransform rt = tMainMenu.GetComponent<RectTransform>();
-            if (rt != null) { rt.anchoredPosition = new Vector2(0, -125); rt.sizeDelta = new Vector2(440, 58); }
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -125); rt.sizeDelta = new Vector2(440, 56); }
         }
     }
 
@@ -788,6 +900,13 @@ public class RollingSkyGameManager : MonoBehaviour
         }
     }
 
+    Font GetDefaultFont()
+    {
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        return font;
+    }
+
     public void TriggerGameOver(string reason)
     {
         if (isGameOver || isVictory) return;
@@ -807,9 +926,15 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (gameOverPanel != null)
         {
+            EnsureGameOverPanelButtons(gameOverPanel, GetDefaultFont());
             gameOverPanel.transform.SetAsLastSibling();
             gameOverPanel.SetActive(true);
-            if (gameOverReasonText != null) gameOverReasonText.text = reason;
+            if (gameOverReasonText != null)
+            {
+                gameOverReasonText.text = reason;
+                gameOverReasonText.horizontalOverflow = HorizontalWrapMode.Wrap;
+                gameOverReasonText.verticalOverflow = VerticalWrapMode.Overflow;
+            }
 
             if (isEndlessMode)
             {
@@ -828,12 +953,19 @@ public class RollingSkyGameManager : MonoBehaviour
                 if (gameOverProgressText != null)
                 {
                     gameOverProgressText.text = $"無盡跑酷得分: {score} 分 (歷史最佳: {bestScore} 分)";
+                    gameOverProgressText.horizontalOverflow = HorizontalWrapMode.Wrap;
+                    gameOverProgressText.verticalOverflow = VerticalWrapMode.Overflow;
                 }
             }
             else
             {
                 float percent = Mathf.Clamp01(currentDist / trackLength) * 100f;
-                if (gameOverProgressText != null) gameOverProgressText.text = $"完成度: {percent:F0}%";
+                if (gameOverProgressText != null)
+                {
+                    gameOverProgressText.text = $"完成度: {percent:F0}%";
+                    gameOverProgressText.horizontalOverflow = HorizontalWrapMode.Wrap;
+                    gameOverProgressText.verticalOverflow = VerticalWrapMode.Overflow;
+                }
             }
         }
 
@@ -870,28 +1002,63 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (victoryPanel != null)
         {
+            EnsureVictoryPanelButtons(victoryPanel, GetDefaultFont());
+
             Transform subT = victoryPanel.transform.Find("Sub");
             if (subT != null)
             {
                 Text t = subT.GetComponent<Text>();
                 if (t != null)
                 {
+                    t.horizontalOverflow = HorizontalWrapMode.Wrap;
+                    t.verticalOverflow = VerticalWrapMode.Overflow;
                     if (currentLevel >= 10)
-                        t.text = "🏆 恭喜征服第 10 關！通關全系列所有關卡！你是真正的球王！";
+                        t.text = "恭喜征服第 10 關！通關全系列所有關卡！\n你是真正的滾球之王！";
                     else
                         t.text = $"恭喜征服第 {currentLevel} 關！晶彩跳躍，勢不可擋！";
                 }
             }
 
             Transform tNext = victoryPanel.transform.Find("Btn_NextLevel");
+            Transform tRestart = victoryPanel.transform.Find("Btn_Restart");
+            Transform tMainMenu = victoryPanel.transform.Find("Btn_MainMenu");
+
+            bool canGoNext = (currentLevel < 10) && !isEndlessMode;
             if (tNext != null)
             {
-                bool canGoNext = (currentLevel < 10) && !isEndlessMode;
                 tNext.gameObject.SetActive(canGoNext);
                 Text nextText = tNext.GetComponentInChildren<Text>();
                 if (nextText != null)
                 {
                     nextText.text = $"⏩ 前往第 {currentLevel + 1} 關 (NEXT LEVEL)";
+                }
+            }
+
+            // 第10關或無盡模式下沒有下一關按鈕時，將按鈕向上平移置中
+            if (!canGoNext)
+            {
+                if (tRestart != null)
+                {
+                    RectTransform rt = tRestart.GetComponent<RectTransform>();
+                    if (rt != null) rt.anchoredPosition = new Vector2(0, -20);
+                }
+                if (tMainMenu != null)
+                {
+                    RectTransform rt = tMainMenu.GetComponent<RectTransform>();
+                    if (rt != null) rt.anchoredPosition = new Vector2(0, -90);
+                }
+            }
+            else
+            {
+                if (tRestart != null)
+                {
+                    RectTransform rt = tRestart.GetComponent<RectTransform>();
+                    if (rt != null) rt.anchoredPosition = new Vector2(0, -55);
+                }
+                if (tMainMenu != null)
+                {
+                    RectTransform rt = tMainMenu.GetComponent<RectTransform>();
+                    if (rt != null) rt.anchoredPosition = new Vector2(0, -125);
                 }
             }
 

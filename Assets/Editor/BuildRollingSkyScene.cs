@@ -237,21 +237,22 @@ public class BuildRollingSkyScene : Editor
 
         // 10. GameOver 面板
         GameObject goPanel = CreatePopupPanel(canvasObj.transform, "GameOverPanel", new Color(0.35f, 0.03f, 0.06f, 0.92f));
-        Text goReason = CreateText(goPanel.transform, "Reason", "墜落深淵！", 52, new Color(1f, 0.35f, 0.35f), new Vector2(0, 160), defaultFont);
-        Text goProg = CreateText(goPanel.transform, "Progress", "完成度: 0%", 38, Color.yellow, new Vector2(0, 90), defaultFont);
-        CreateText(goPanel.transform, "Hint", "快捷鍵：按 [R] 鍵重新挑戰 | [ESC] 回到主選單", 24, new Color(0.85f, 0.85f, 0.85f), new Vector2(0, 20), defaultFont);
+        Text goReason = CreateText(goPanel.transform, "Reason", "墜落深淵！", 44, Color.white, new Vector2(0, 140), defaultFont);
+        Text goProg = CreateText(goPanel.transform, "Progress", "完成度: 0%", 34, Color.yellow, new Vector2(0, 60), defaultFont);
+        CreateText(goPanel.transform, "Hint", "快捷鍵：按 [R] 鍵重新挑戰 | [ESC] 回到主選單", 22, new Color(0.85f, 0.85f, 0.85f, 0.85f), new Vector2(0, 5), defaultFont);
 
-        CreateStyledButton(goPanel.transform, "Btn_Restart", "🔄 重新挑戰 (RETRY)", new Vector2(0, -60), new Vector2(440, 65), 30, defaultFont);
-        CreateStyledButton(goPanel.transform, "Btn_MainMenu", "🏠 回到主選單 (MAIN MENU)", new Vector2(0, -140), new Vector2(440, 65), 30, defaultFont);
+        CreateStyledButton(goPanel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -65), new Vector2(440, 60), 28, defaultFont);
+        CreateStyledButton(goPanel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -140), new Vector2(440, 60), 28, defaultFont);
 
         // 11. Victory 面板
         GameObject vicPanel = CreatePopupPanel(canvasObj.transform, "VictoryPanel", new Color(0.02f, 0.22f, 0.15f, 0.92f));
-        CreateText(vicPanel.transform, "Title", "🎉 100% 完美通關！", 56, Color.yellow, new Vector2(0, 160), defaultFont);
-        CreateText(vicPanel.transform, "Sub", "你成功征服了《極速躍動 3D (Rolling Leap)》賽博賽道！", 32, Color.white, new Vector2(0, 95), defaultFont);
-        CreateText(vicPanel.transform, "Hint", "快捷鍵：按 [R] 鍵再次挑戰 | [ESC] 回到主選單", 24, new Color(0.85f, 0.85f, 0.85f), new Vector2(0, 25), defaultFont);
+        CreateText(vicPanel.transform, "Title", "🎉 100% 完美通關！", 52, Color.yellow, new Vector2(0, 160), defaultFont);
+        CreateText(vicPanel.transform, "Sub", "你成功征服了《極速躍動 3D (Rolling Leap)》賽博賽道！", 26, Color.white, new Vector2(0, 80), defaultFont);
+        CreateText(vicPanel.transform, "Hint", "快捷鍵：按 [R] 鍵再次挑戰 | [ESC] 回到主選單", 20, new Color(0.85f, 0.85f, 0.85f, 0.75f), new Vector2(0, 20), defaultFont);
 
-        CreateStyledButton(vicPanel.transform, "Btn_Restart", "🔄 再次挑戰 (REPLAY)", new Vector2(0, -55), new Vector2(440, 65), 30, defaultFont);
-        CreateStyledButton(vicPanel.transform, "Btn_MainMenu", "🏠 回到主選單 (MAIN MENU)", new Vector2(0, -135), new Vector2(440, 65), 30, defaultFont);
+        CreateStyledButton(vicPanel.transform, "Btn_NextLevel", "⏩ 前往下一關 (NEXT LEVEL)", new Vector2(0, 10), new Vector2(440, 56), 26, defaultFont);
+        CreateStyledButton(vicPanel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -55), new Vector2(440, 56), 26, defaultFont);
+        CreateStyledButton(vicPanel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -125), new Vector2(440, 56), 26, defaultFont);
 
         // 12. GameManager 配置
         GameObject gmObj = new GameObject("GameManager");
