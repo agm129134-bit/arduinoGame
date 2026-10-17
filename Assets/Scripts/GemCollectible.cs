@@ -5,7 +5,7 @@ public class GemCollectible : MonoBehaviour
 {
     [Header("Visual Effects")]
     public float rotateSpeed = 120.0f;
-    public float floatAmplitude = 0.22f;
+    public float floatAmplitude = 0.12f;
     public float floatFrequency = 2.4f;
 
     private Vector3 initialPos;
@@ -55,17 +55,16 @@ public class GemCollectible : MonoBehaviour
         MeshFilter mf = GetComponent<MeshFilter>();
         if (mf == null) mf = gameObject.AddComponent<MeshFilter>();
 
-        // 建立雙尖八面體璀璨鑽石幾何
+        // 建立雙尖八面體璀璨鑽石幾何 (總高 1.0m，半徑 0.45m，與賽道完美契合不穿模)
         Mesh mesh = new Mesh();
         mesh.name = "CrystalDiamondMesh";
 
-        // 6個原始頂點：上尖端、下尖端、赤道四頂點 (加大尺寸至 0.85m 高，強化視覺辨識)
-        Vector3 top = new Vector3(0, 0.85f, 0);
-        Vector3 bottom = new Vector3(0, -0.85f, 0);
-        Vector3 vNorth = new Vector3(0, 0, 0.62f);
-        Vector3 vEast = new Vector3(0.62f, 0, 0);
-        Vector3 vSouth = new Vector3(0, 0, -0.62f);
-        Vector3 vWest = new Vector3(-0.62f, 0, 0);
+        Vector3 top = new Vector3(0, 0.5f, 0);
+        Vector3 bottom = new Vector3(0, -0.5f, 0);
+        Vector3 vNorth = new Vector3(0, 0, 0.45f);
+        Vector3 vEast = new Vector3(0.45f, 0, 0);
+        Vector3 vSouth = new Vector3(0, 0, -0.45f);
+        Vector3 vWest = new Vector3(-0.45f, 0, 0);
 
         // 為了呈現寶石折射立體切面感 (Flat Shading Facets)，每個三角形獨立頂點
         Vector3[] vertices = new Vector3[24];
@@ -94,7 +93,7 @@ public class GemCollectible : MonoBehaviour
         SphereCollider sc = GetComponent<SphereCollider>();
         if (sc != null)
         {
-            sc.radius = 0.7f;
+            sc.radius = 0.55f;
             sc.isTrigger = true;
         }
     }
@@ -178,8 +177,8 @@ public class GemCollectible : MonoBehaviour
         int segments = 16;
         Vector3[] verts = new Vector3[segments * 2];
         int[] tris = new int[segments * 6];
-        float innerR = 0.85f;
-        float outerR = 1.15f;
+        float innerR = 0.55f;
+        float outerR = 0.75f;
 
         for (int i = 0; i < segments; i++)
         {

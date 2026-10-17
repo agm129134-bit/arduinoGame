@@ -527,38 +527,62 @@ public class RollingSkyGameManager : MonoBehaviour
     void EnsureVictoryPanelButtons(GameObject panel, Font font)
     {
         if (panel == null) return;
+
+        // 重構並重置標題與副標題座標，徹底杜絕按鈕與文本重疊
+        Transform tTitle = panel.transform.Find("Title");
+        if (tTitle != null)
+        {
+            RectTransform rtTitle = tTitle.GetComponent<RectTransform>();
+            if (rtTitle != null)
+            {
+                rtTitle.anchoredPosition = new Vector2(0, 160);
+                rtTitle.sizeDelta = new Vector2(800, 70);
+            }
+        }
+
+        Transform tSub = panel.transform.Find("Sub");
+        if (tSub != null)
+        {
+            RectTransform rtSub = tSub.GetComponent<RectTransform>();
+            if (rtSub != null)
+            {
+                rtSub.anchoredPosition = new Vector2(0, 90);
+                rtSub.sizeDelta = new Vector2(850, 50);
+            }
+        }
+
         Transform tNext = panel.transform.Find("Btn_NextLevel");
         Transform tRestart = panel.transform.Find("Btn_Restart");
         Transform tMainMenu = panel.transform.Find("Btn_MainMenu");
 
         if (tNext == null)
         {
-            CreateStyledButton(panel.transform, "Btn_NextLevel", "⏩ 前往下一關 (NEXT LEVEL)", new Vector2(0, -10), new Vector2(440, 60), 28, font);
+            CreateStyledButton(panel.transform, "Btn_NextLevel", "⏩ 前往下一關 (NEXT LEVEL)", new Vector2(0, 15), new Vector2(440, 58), 26, font);
         }
         else
         {
             RectTransform rt = tNext.GetComponent<RectTransform>();
-            if (rt != null) { rt.anchoredPosition = new Vector2(0, -10); rt.sizeDelta = new Vector2(440, 60); }
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, 15); rt.sizeDelta = new Vector2(440, 58); }
         }
 
         if (tRestart == null)
         {
-            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -80), new Vector2(440, 60), 28, font);
+            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -55), new Vector2(440, 58), 26, font);
         }
         else
         {
             RectTransform rt = tRestart.GetComponent<RectTransform>();
-            if (rt != null) { rt.anchoredPosition = new Vector2(0, -80); rt.sizeDelta = new Vector2(440, 60); }
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -55); rt.sizeDelta = new Vector2(440, 58); }
         }
 
         if (tMainMenu == null)
         {
-            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -150), new Vector2(440, 60), 28, font);
+            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -125), new Vector2(440, 58), 26, font);
         }
         else
         {
             RectTransform rt = tMainMenu.GetComponent<RectTransform>();
-            if (rt != null) { rt.anchoredPosition = new Vector2(0, -150); rt.sizeDelta = new Vector2(440, 60); }
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -125); rt.sizeDelta = new Vector2(440, 58); }
         }
     }
 
@@ -823,6 +847,21 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (pausePanel != null) pausePanel.SetActive(false);
         if (inGameSettingsPanel != null) inGameSettingsPanel.SetActive(false);
+
+        // 平滑凍結小球物理，杜絕撞牆卡住或衝入虛空
+        if (ball != null)
+        {
+            Rigidbody rb = ball.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.isKinematic = true;
+            }
+        }
+
+        // 強制更新進度條為 100% 完美通關狀態
+        if (progressBar != null) progressBar.value = 1.0f;
+        if (progressText != null) progressText.text = "100%";
 
         // 標記本關卡已通關
         int currentLevel = PlayerPrefs.GetInt("SelectedLevel", 1);
