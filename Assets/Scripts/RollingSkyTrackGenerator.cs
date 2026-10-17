@@ -29,6 +29,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
     private Transform ballTransform;
     private bool isEndlessActive = false;
     private GameObject trackRoot;
+    private PhysicsMaterial tilePhysicMaterial;
 
     private const float COL_WIDTH = 2.0f; // 每線道寬度 2m
     private const float ROW_LEN = 2.0f;   // 每地磚長度 2m
@@ -140,6 +141,16 @@ public class RollingSkyTrackGenerator : MonoBehaviour
             matGem.SetFloat("_Glossiness", 0.98f);
         }
         if (matGoal == null) matGoal = CreateFallbackMat(new Color(1f, 0.85f, 0.1f));
+
+        if (tilePhysicMaterial == null)
+        {
+            tilePhysicMaterial = new PhysicsMaterial("TileZeroBounce");
+            tilePhysicMaterial.bounciness = 0f;
+            tilePhysicMaterial.bounceCombine = PhysicsMaterialCombine.Minimum;
+            tilePhysicMaterial.dynamicFriction = 0.05f;
+            tilePhysicMaterial.staticFriction = 0.05f;
+            tilePhysicMaterial.frictionCombine = PhysicsMaterialCombine.Minimum;
+        }
     }
 
     Material CreateFallbackMat(Color col)
@@ -452,36 +463,36 @@ public class RollingSkyTrackGenerator : MonoBehaviour
     // ---------- LEVEL 6 : 升降律動 (Piston Pulse) ----------
     void BuildLevel_6(Transform parent)
     {
-        // 總排數 195 (390m)：多層次垂直階梯跳躍與高空平台飛躍
+        // 總排數 195 (390m)：深淵連環大跳躍與全平面平滑衝刺 (全關卡統一 0f 高度，消除著陸階梯落差小跳)
         BuildSection(parent, 0, 25, new int[] { -2, -1, 0, 1, 2 });
 
-        // 第 1 段階梯跳躍：地面 height 0 跳躍至台階 height 1.5f
-        CreateJumpOverGap(parent, 24, 32, 0, 0f);
+        // 第 1 段深淵彈射：飛越第 25~31 排深淵
+        CreateJumpOverGap(parent, 24, 32, 0);
 
-        // 第一層高空平台 (height 1.5f)
-        BuildSection(parent, 32, 60, new int[] { -1, 0, 1 }, 1.5f);
+        // 第 1 區 3 線道，懸浮寶石與左右障礙
+        BuildSection(parent, 32, 60, new int[] { -1, 0, 1 });
         for (int r = 34; r < 58; r += 4)
         {
-            CreateGem(parent, new Vector3(0, 1.5f, r * ROW_LEN));
-            if (r % 8 == 0) CreateHazard(parent, new Vector3(-COL_WIDTH, 2.0f, r * ROW_LEN));
+            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+            if (r % 8 == 0) CreateHazard(parent, new Vector3(-COL_WIDTH, 0.5f, r * ROW_LEN));
         }
 
-        // 第 2 段階梯跳躍：台階 height 1.5f 跳躍至天際平台 height 3.0f
-        CreateJumpOverGap(parent, 59, 68, 0, 1.5f);
+        // 第 2 段深淵彈射：飛越第 60~67 排深淵
+        CreateJumpOverGap(parent, 59, 68, 0);
 
-        // 第二層高空平台 (height 3.0f)
-        BuildSection(parent, 68, 100, new int[] { -1, 0, 1 }, 3.0f);
+        // 第 2 區 3 線道
+        BuildSection(parent, 68, 100, new int[] { -1, 0, 1 });
         for (int r = 70; r < 98; r += 4)
         {
-            CreateGem(parent, new Vector3(0, 3.0f, r * ROW_LEN));
-            if (r % 8 == 4) CreateHazard(parent, new Vector3(COL_WIDTH, 3.5f, r * ROW_LEN));
+            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+            if (r % 8 == 4) CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, r * ROW_LEN));
         }
 
-        // 天際俯衝大跳躍：自 height 3.0f 降落回 height 0f
-        CreateJumpOverGap(parent, 99, 109, 0, 3.0f);
+        // 第 3 段大跳躍：飛越第 100~108 排深淵
+        CreateJumpOverGap(parent, 99, 109, 0);
 
         // 地面平台恢復衝刺
-        BuildSection(parent, 109, 145, new int[] { -1, 0, 1 }, 0f);
+        BuildSection(parent, 109, 145, new int[] { -1, 0, 1 });
         for (int r = 112; r < 142; r += 5)
         {
             CreateHazard(parent, new Vector3(((r % 2 == 0) ? -COL_WIDTH : COL_WIDTH), 0.5f, r * ROW_LEN));
@@ -489,7 +500,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         }
 
         // 終曲跳躍
-        CreateJumpOverGap(parent, 144, 155, 0, 0f);
+        CreateJumpOverGap(parent, 144, 155, 0);
         BuildSection(parent, 155, 187, new int[] { -2, -1, 0, 1, 2 });
         for (int r = 158; r <= 182; r += 4)
             CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
@@ -670,25 +681,25 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         // 階段 1：大彈射飛越首道深淵
         CreateJumpOverGap(parent, 27, 37, 0);
 
-        // 階段 2：升高台階 (height 1.5f)
-        BuildSection(parent, 37, 65, new int[] { -1, 0, 1 }, 1.5f);
+        // 階段 2：衝刺 3 線道 (全關卡統一 0f 高度，消除著陸階梯落差小跳)
+        BuildSection(parent, 37, 65, new int[] { -1, 0, 1 });
         for (int r = 39; r < 63; r += 4)
         {
-            CreateGem(parent, new Vector3(0, 1.5f, r * ROW_LEN));
-            if (r % 8 == 0) CreateHazard(parent, new Vector3(-COL_WIDTH, 2.0f, r * ROW_LEN));
+            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+            if (r % 8 == 0) CreateHazard(parent, new Vector3(-COL_WIDTH, 0.5f, r * ROW_LEN));
         }
 
-        // 階段 3：台階跳躍至天際平台 (height 3.0f)
-        CreateJumpOverGap(parent, 64, 74, 0, 1.5f);
-        BuildSection(parent, 74, 105, new int[] { -1, 0, 1 }, 3.0f);
+        // 階段 3：大跳躍
+        CreateJumpOverGap(parent, 64, 74, 0);
+        BuildSection(parent, 74, 105, new int[] { -1, 0, 1 });
         for (int r = 76; r < 103; r += 4)
         {
-            CreateGem(parent, new Vector3(0, 3.0f, r * ROW_LEN));
-            if (r % 8 == 4) CreateHazard(parent, new Vector3(COL_WIDTH, 3.5f, r * ROW_LEN));
+            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+            if (r % 8 == 4) CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, r * ROW_LEN));
         }
 
-        // 階段 4：天際俯衝降落回地面
-        CreateJumpOverGap(parent, 104, 114, 0, 3.0f);
+        // 階段 4：大跳躍
+        CreateJumpOverGap(parent, 104, 114, 0);
 
         // 階段 5：雙子峽谷分流 (-2, -1 與 1, 2)
         BuildSection(parent, 114, 146, new int[] { -2, -1 });
@@ -841,14 +852,12 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                 BuildSection(chunk.transform, startRow + 16, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 break;
 
-            case 5: // 【階梯高低斷崖落下】自 2 米高台俯衝躍下！感受極速重力加速度與深淵落差
-                BuildSection(chunk.transform, startRow, startRow + 6, new int[] { -1, 0, 1 }, height: 2.0f);
-                CreateGem(chunk.transform, new Vector3(0, 2.95f, (startRow + 3) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(0, 2.0f, (startRow + 6.5f) * ROW_LEN));
-                // 第 6, 7 排為空中下墜斷層，小球順著重力俯衝落入地面
-                BuildSection(chunk.transform, startRow + 8, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 }, height: 0.0f);
-                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 12) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 16) * ROW_LEN));
+            case 5: // 【空中大跳躍長廊】深淵飛越與全速衝刺 (統一 0f 高度，消除階梯下墜落差)
+                BuildSection(chunk.transform, startRow, startRow + 5, new int[] { -1, 0, 1 });
+                CreateJumpOverGap(chunk.transform, startRow + 4, startRow + 8, 0);
+                BuildSection(chunk.transform, startRow + 8, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
+                CreateGem(chunk.transform, new Vector3(0, 0, (startRow + 12) * ROW_LEN));
+                CreateGem(chunk.transform, new Vector3(0, 0, (startRow + 16) * ROW_LEN));
                 break;
 
             case 6: // 【雙分叉中央大深淵】正中間 6 米全鏤空深淵！左右兩側獨立飛馳
@@ -986,6 +995,14 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         // 棋盤格交替色
         bool isAlt = (Mathf.Abs(col) + row) % 2 == 0;
         tile.GetComponent<MeshRenderer>().material = isAlt ? matTileDark : matTileCyan;
+
+        // ★ 關鍵：將 BoxCollider 尺寸擴展為 100% 無縫覆蓋 (消除 0.96 留下的 8cm 縫隙撞角)
+        BoxCollider bc = tile.GetComponent<BoxCollider>();
+        if (bc != null)
+        {
+            bc.size = new Vector3(1f / 0.96f, 1f, 1f / 0.96f);
+            if (tilePhysicMaterial != null) bc.sharedMaterial = tilePhysicMaterial;
+        }
     }
 
     void CreateHazard(Transform parent, Vector3 pos)
@@ -1009,7 +1026,13 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         pad.transform.localScale = new Vector3(COL_WIDTH * 0.92f, 0.12f, ROW_LEN * 0.92f);
         pad.GetComponent<MeshRenderer>().material = matJumpPad;
         BoxCollider bc = pad.GetComponent<BoxCollider>();
-        if (bc != null) bc.isTrigger = true;
+        if (bc != null)
+        {
+            bc.isTrigger = true;
+            // 向上延伸為 3.6m 高立體垂直感應柱 (0.12 * 30 = 3.6m)，小球無論微浮空、顛簸或空中小跳均能 100% 觸發
+            bc.size = new Vector3(1.0f, 30.0f, 1.0f);
+            bc.center = new Vector3(0, 14.5f, 0);
+        }
         JumpPad jp = pad.AddComponent<JumpPad>();
         if (force > 0f) jp.launchForce = force;
     }

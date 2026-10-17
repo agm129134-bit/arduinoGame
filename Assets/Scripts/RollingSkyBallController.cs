@@ -41,6 +41,17 @@ public class RollingSkyBallController : MonoBehaviour
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
         rb.constraints = RigidbodyConstraints.FreezeRotation; // 透過代碼平滑旋轉視覺，防止物理碰撞翻滾卡軌
+
+        // 動態賦予零反彈無摩擦物理材質，徹底杜絕著陸碰撞反彈與跳躍殘留
+        PhysicsMaterial zeroBounceMat = new PhysicsMaterial("BallZeroBounce");
+        zeroBounceMat.bounciness = 0f;
+        zeroBounceMat.bounceCombine = PhysicsMaterialCombine.Minimum;
+        zeroBounceMat.dynamicFriction = 0.05f;
+        zeroBounceMat.staticFriction = 0.05f;
+        zeroBounceMat.frictionCombine = PhysicsMaterialCombine.Minimum;
+
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.sharedMaterial = zeroBounceMat;
     }
 
     private KeyCode customKeyLeft = KeyCode.A;
@@ -276,6 +287,8 @@ public class RollingSkyBallController : MonoBehaviour
         vel.z = forwardSpeed * forwardBoost;
         rb.linearVelocity = vel;
         isGrounded = false;
+        coyoteTimer = 0f;
+        jumpBufferTimer = 0f;
         AudioManager.Instance?.PlayJump();
     }
 
