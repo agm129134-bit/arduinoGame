@@ -896,12 +896,12 @@ public class RollingSkyMenuManager : MonoBehaviour
         txtCurrentBgm = CreateText(pAudio.transform, "Txt_CurrentBgm", "當前播放: Ver A: 霓虹賽博", 24, Color.cyan, new Vector2(0, 45), new Vector2(800, 40), font, FontStyle.Normal);
 
         CreateText(pAudio.transform, "Lbl_BgmVol", "音樂音量 (BGM VOLUME):", 28, Color.white, new Vector2(-240, -40), new Vector2(420, 50), font, FontStyle.Bold);
-        sliderBgmVolume = CreateSlider(pAudio.transform, "Slider_BgmVolume", new Vector2(100, -40), new Vector2(320, 30), 0f, 1f, 0.7f);
-        txtBgmVolume = CreateText(pAudio.transform, "Txt_BgmVolVal", "70%", 26, Color.cyan, new Vector2(320, -40), new Vector2(100, 50), font, FontStyle.Bold);
+        sliderBgmVolume = CreateSlider(pAudio.transform, "Slider_BgmVolume", new Vector2(100, -40), new Vector2(320, 30), 0f, 1f, 0.5f);
+        txtBgmVolume = CreateText(pAudio.transform, "Txt_BgmVolVal", "50%", 26, Color.cyan, new Vector2(320, -40), new Vector2(100, 50), font, FontStyle.Bold);
 
         CreateText(pAudio.transform, "Lbl_SfxVol", "音效音量 (SFX VOLUME):", 28, Color.white, new Vector2(-240, -120), new Vector2(420, 50), font, FontStyle.Bold);
-        sliderSfxVolume = CreateSlider(pAudio.transform, "Slider_SfxVolume", new Vector2(100, -120), new Vector2(320, 30), 0f, 1f, 0.8f);
-        txtSfxVolume = CreateText(pAudio.transform, "Txt_SfxVolVal", "80%", 26, Color.cyan, new Vector2(320, -120), new Vector2(100, 50), font, FontStyle.Bold);
+        sliderSfxVolume = CreateSlider(pAudio.transform, "Slider_SfxVolume", new Vector2(100, -120), new Vector2(320, 30), 0f, 1f, 0.5f);
+        txtSfxVolume = CreateText(pAudio.transform, "Txt_SfxVolVal", "50%", 26, Color.cyan, new Vector2(320, -120), new Vector2(100, 50), font, FontStyle.Bold);
 
         btnTestSfx = CreateStyledButton(pAudio.transform, "Btn_TestSfx", "🔊 試聽音效 (TEST SFX)", new Vector2(0, -210), new Vector2(320, 55), 22, font);
 
@@ -1195,8 +1195,8 @@ public class RollingSkyMenuManager : MonoBehaviour
 
         // 3. 音效預設
         currentBgmIndex = 0;
-        if (sliderBgmVolume != null) sliderBgmVolume.value = 0.7f;
-        if (sliderSfxVolume != null) sliderSfxVolume.value = 0.8f;
+        if (sliderBgmVolume != null) sliderBgmVolume.value = 0.5f;
+        if (sliderSfxVolume != null) sliderSfxVolume.value = 0.5f;
         SelectBgmTrack(0);
 
         Debug.Log("⚙️ 所有設定已重設為出廠最佳預設值！");
@@ -1290,12 +1290,12 @@ public class RollingSkyMenuManager : MonoBehaviour
         currentBgmIndex = PlayerPrefs.GetInt("BGM_Track_Index", 0);
         if (sliderBgmVolume != null)
         {
-            sliderBgmVolume.value = PlayerPrefs.GetFloat("BGM_Volume", 0.7f);
+            sliderBgmVolume.value = PlayerPrefs.GetFloat("BGM_Volume", 0.5f);
             if (txtBgmVolume != null) txtBgmVolume.text = $"{sliderBgmVolume.value * 100f:F0}%";
         }
         if (sliderSfxVolume != null)
         {
-            sliderSfxVolume.value = PlayerPrefs.GetFloat("SFX_Volume", 0.8f);
+            sliderSfxVolume.value = PlayerPrefs.GetFloat("SFX_Volume", 0.5f);
             if (txtSfxVolume != null) txtSfxVolume.text = $"{sliderSfxVolume.value * 100f:F0}%";
         }
         UpdateBgmUI();

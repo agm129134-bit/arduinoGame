@@ -102,6 +102,34 @@ public class TrackBuilderManager : MonoBehaviour
             if (camCtrl != null) camCtrl.enabled = false;
         }
 
+        // 清理場景中任何舊賽道階層與殘留物件，確保給玩家 100% 空白無雜物的畫布
+        GameObject legacyTrack = GameObject.Find("--- Track Hierarchy ---");
+        if (legacyTrack != null) Destroy(legacyTrack);
+
+        GameObject tr = GameObject.Find("TrackRoot");
+        if (tr != null)
+        {
+            for (int i = tr.transform.childCount - 1; i >= 0; i--)
+            {
+                Destroy(tr.transform.GetChild(i).gameObject);
+            }
+        }
+
+        foreach (var gem in FindObjectsByType<GemCollectible>(FindObjectsSortMode.None))
+        {
+            Destroy(gem.gameObject);
+        }
+        foreach (var pad in FindObjectsByType<JumpPad>(FindObjectsSortMode.None))
+        {
+            Destroy(pad.gameObject);
+        }
+        foreach (var haz in FindObjectsByType<Hazard>(FindObjectsSortMode.None))
+        {
+            Destroy(haz.gameObject);
+        }
+        GameObject starGate = GameObject.Find("FinishStarGate");
+        if (starGate != null) Destroy(starGate);
+
         // 預設全空畫布，讓玩家從零自由建造，不強制預填任何方塊
         LoadSavedTrack();
         CreateVisualGrid();
@@ -473,12 +501,18 @@ public class TrackBuilderManager : MonoBehaviour
         tObj.transform.SetParent(builderUIPanel.transform, false);
         infoText = tObj.AddComponent<Text>();
         infoText.font = font;
-        infoText.fontSize = 24;
+        infoText.fontSize = 20;
         infoText.color = Color.cyan;
         infoText.alignment = TextAnchor.UpperCenter;
+        infoText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        infoText.verticalOverflow = VerticalWrapMode.Overflow;
+        infoText.lineSpacing = 1.15f;
         RectTransform rt = tObj.GetComponent<RectTransform>();
-        rt.anchoredPosition = new Vector2(0, -30);
-        rt.sizeDelta = new Vector2(1200, 80);
+        rt.anchorMin = new Vector2(0.5f, 1f);
+        rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(0, -25);
+        rt.sizeDelta = new Vector2(1750, 130);
 
         // 底部工具列按鈕
         CreateButton(builderUIPanel.transform, "Btn_Play", "▶ 測試遊玩 (PLAY)", new Vector2(-360, 60), new Vector2(220, 55), StartTestPlay, font);
@@ -556,6 +590,7 @@ public class TrackBuilderManager : MonoBehaviour
         if (currentType == 4) typeName = "水晶寶石 (Gem)";
 
         infoText.text = $"【自訂場地編輯器】 游標座標: (欄 {cursorCol}, 排 {cursorRow} / {MAX_ROWS - 1}) | 當前物件: <color=yellow>{typeName}</color>\n" +
-                        "按鍵提示: [WASD/方向鍵] 移動游標 (Shift加速5排 / PgUp/PgDn加速15排 / Home·End首末) | [1] 地磚 | [2] 彈跳墊 | [3] 尖刺 | [4] 寶石 | [0] 消除";
+                        "移動操作: [WASD / 方向鍵] 移動游標 (Shift: 加速5排 | PgUp/PgDn: 加速15排 | Home/End: 直達首尾)\n" +
+                        "放置物件: [1] 普通地磚  |  [2] 彈跳墊  |  [3] 尖刺陷阱  |  [4] 水晶寶石  |  [0/Del/Backspace] 消除方塊";
     }
 }

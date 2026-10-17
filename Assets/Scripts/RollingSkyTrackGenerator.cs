@@ -48,9 +48,34 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         bool isEndless = PlayerPrefs.GetInt("IsEndlessMode", 0) == 1;
         bool isBuilder = PlayerPrefs.GetInt("IsBuilderMode", 0) == 1;
 
+        // 清理場景中任何預設的舊靜態賽道階層（如場景自帶的 --- Track Hierarchy ---）
+        GameObject legacyTrack = GameObject.Find("--- Track Hierarchy ---");
+        if (legacyTrack != null)
+        {
+            Destroy(legacyTrack);
+        }
+
         if (isBuilder)
         {
             // 在自訂建造模式下，由 TrackBuilderManager 全權掌管建造與視覺，本生成器不預先生成靜態賽道
+            // 且需徹底清空場景中預置的舊方塊、寶石、尖刺、跳台等物件，確保留給玩家完全空白的地圖
+            GetOrCreateTrackRoot(clearExisting: true);
+
+            foreach (var gem in FindObjectsByType<GemCollectible>(FindObjectsSortMode.None))
+            {
+                Destroy(gem.gameObject);
+            }
+            foreach (var pad in FindObjectsByType<JumpPad>(FindObjectsSortMode.None))
+            {
+                Destroy(pad.gameObject);
+            }
+            foreach (var haz in FindObjectsByType<Hazard>(FindObjectsSortMode.None))
+            {
+                Destroy(haz.gameObject);
+            }
+            GameObject gate = GameObject.Find("FinishStarGate");
+            if (gate != null) Destroy(gate);
+
             return;
         }
         else if (isEndless)

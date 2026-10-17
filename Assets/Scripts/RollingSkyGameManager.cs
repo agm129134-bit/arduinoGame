@@ -22,6 +22,13 @@ public class RollingSkyGameManager : MonoBehaviour
     public Text gameOverReasonText;
     public Text gameOverProgressText;
     public GameObject victoryPanel;
+    public GameObject inGameSettingsPanel;
+
+    private Slider sliderBgmVolume;
+    private Text txtBgmVolume;
+    private Slider sliderSfxVolume;
+    private Text txtSfxVolume;
+    private Text txtFullscreenState;
 
     private int collectedGems = 0;
     private int totalGemsInLevel = 0;
@@ -127,9 +134,15 @@ public class RollingSkyGameManager : MonoBehaviour
             return;
         }
 
-        // ESC 鍵處理：若已結算則直接回主選單，遊戲中則切換暫停面板
+        // ESC 鍵處理：若設定面板開著則返回暫停面板，若已結算則回主選單，遊戲中則切換暫停面板
         if (Input.GetKeyDown(KeyCode.Escape))
         {
+            if (inGameSettingsPanel != null && inGameSettingsPanel.activeSelf)
+            {
+                CloseInGameSettings();
+                return;
+            }
+
             if (isGameOver || isVictory)
             {
                 ReturnToMainMenu();
@@ -157,10 +170,16 @@ public class RollingSkyGameManager : MonoBehaviour
         Debug.Log($"💎 [Debug] 寶石已增加 {count}！當前累計總寶石: {totalGems}");
     }
 
-    // --- 暫停管理 (含自動容錯建立) ---
+    // --- 暫停管理 (含自動容錯建立與即時設定支援) ---
     public void TogglePause()
     {
         if (isGameOver || isVictory) return;
+
+        if (inGameSettingsPanel != null && inGameSettingsPanel.activeSelf)
+        {
+            CloseInGameSettings();
+            return;
+        }
 
         if (pausePanel == null)
         {
@@ -177,6 +196,11 @@ public class RollingSkyGameManager : MonoBehaviour
             pausePanel.SetActive(isPaused);
         }
 
+        if (!isPaused && inGameSettingsPanel != null)
+        {
+            inGameSettingsPanel.SetActive(false);
+        }
+
         Debug.Log(isPaused ? "[GameManager] 遊戲已暫停 (PAUSED)" : "[GameManager] 遊戲已繼續 (RESUMED)");
     }
 
@@ -185,6 +209,7 @@ public class RollingSkyGameManager : MonoBehaviour
         isPaused = false;
         Time.timeScale = 1.0f;
         if (pausePanel != null) pausePanel.SetActive(false);
+        if (inGameSettingsPanel != null) inGameSettingsPanel.SetActive(false);
     }
 
     // --- 場景導航 ---
@@ -249,17 +274,32 @@ public class RollingSkyGameManager : MonoBehaviour
             }
         }
 
+        if (inGameSettingsPanel == null)
+        {
+            Transform sTransform = canvas.transform.Find("InGameSettingsPanel");
+            if (sTransform != null)
+            {
+                inGameSettingsPanel = sTransform.gameObject;
+            }
+            else
+            {
+                inGameSettingsPanel = BuildDynamicInGameSettingsPanel(canvas.transform, defaultFont);
+            }
+        }
+
         if (pausePanel != null)
         {
+            EnsurePausePanelButtons(pausePanel, defaultFont);
             pausePanel.transform.SetAsLastSibling();
             pausePanel.SetActive(false);
         }
 
-        EnsurePanelButtons(gameOverPanel, defaultFont);
-        EnsurePanelButtons(victoryPanel, defaultFont);
+        EnsureGameOverPanelButtons(gameOverPanel, defaultFont);
+        EnsureVictoryPanelButtons(victoryPanel, defaultFont);
 
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
         if (victoryPanel != null) victoryPanel.SetActive(false);
+        if (inGameSettingsPanel != null) inGameSettingsPanel.SetActive(false);
     }
 
     GameObject BuildDynamicPausePanel(Transform canvasTransform, Font font)
@@ -277,19 +317,200 @@ public class RollingSkyGameManager : MonoBehaviour
         rt.sizeDelta = Vector2.zero;
 
         CreateText(panel.transform, "Title", "遊戲暫停 PAUSED", 56, new Color(0f, 1f, 0.9f), new Vector2(0, 160), new Vector2(800, 80), font, FontStyle.Bold);
-        CreateText(panel.transform, "Hint", "💡 提示：再次按下 [ESC] 鍵可直接繼續遊戲", 24, new Color(0.4f, 0.9f, 1f), new Vector2(0, 95), new Vector2(800, 60), font, FontStyle.Normal);
+        CreateText(panel.transform, "Hint", "💡 提示：再次按下 [ESC] 鍵可直接繼續遊戲", 24, new Color(0.4f, 0.9f, 1f), new Vector2(0, 105), new Vector2(800, 50), font, FontStyle.Normal);
 
-        CreateStyledButton(panel.transform, "Btn_Resume", "▶ 繼續遊戲 (RESUME)", new Vector2(0, 15), new Vector2(440, 65), 30, font);
-        CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新挑戰 (RESTART)", new Vector2(0, -65), new Vector2(440, 65), 30, font);
-        CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回到主選單 (MAIN MENU)", new Vector2(0, -145), new Vector2(440, 65), 30, font);
+        CreateStyledButton(panel.transform, "Btn_Resume", "▶ 繼續遊戲 (RESUME)", new Vector2(0, 45), new Vector2(440, 58), 28, font);
+        CreateStyledButton(panel.transform, "Btn_Settings", "⚙ 遊戲設定 (SETTINGS)", new Vector2(0, -25), new Vector2(440, 58), 26, font);
+        CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新挑戰 (RESTART)", new Vector2(0, -95), new Vector2(440, 58), 28, font);
+        CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回到主選單 (MAIN MENU)", new Vector2(0, -165), new Vector2(440, 58), 28, font);
 
         return panel;
     }
 
-    void EnsurePanelButtons(GameObject panel, Font font)
+    GameObject BuildDynamicInGameSettingsPanel(Transform canvasTransform, Font font)
+    {
+        GameObject panel = new GameObject("InGameSettingsPanel");
+        panel.transform.SetParent(canvasTransform, false);
+
+        Image img = panel.AddComponent<Image>();
+        img.color = new Color(0.03f, 0.06f, 0.12f, 0.96f);
+        img.raycastTarget = true;
+
+        RectTransform rt = panel.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.sizeDelta = Vector2.zero;
+
+        // 標題
+        CreateText(panel.transform, "Title", "⚙ 遊戲設定 (SETTINGS)", 50, new Color(0f, 1f, 0.9f), new Vector2(0, 200), new Vector2(800, 70), font, FontStyle.Bold);
+        CreateText(panel.transform, "Hint", "💡 即時調整遊戲音量與視窗顯示模式", 22, new Color(0.4f, 0.9f, 1f), new Vector2(0, 150), new Vector2(800, 40), font, FontStyle.Normal);
+
+        // --- 音樂音量 ---
+        CreateText(panel.transform, "Lbl_Bgm", "音樂音量 (BGM):", 24, Color.white, new Vector2(-220, 80), new Vector2(320, 45), font, FontStyle.Bold);
+        sliderBgmVolume = CreateSlider(panel.transform, "Slider_Bgm", new Vector2(70, 80), new Vector2(240, 26), 0f, 1f, PlayerPrefs.GetFloat("BGM_Volume", 0.5f));
+        txtBgmVolume = CreateText(panel.transform, "Txt_BgmVal", $"{sliderBgmVolume.value * 100f:F0}%", 24, Color.cyan, new Vector2(250, 80), new Vector2(90, 45), font, FontStyle.Bold);
+        sliderBgmVolume.onValueChanged.AddListener(OnInGameBgmChanged);
+
+        // --- 音效音量 ---
+        CreateText(panel.transform, "Lbl_Sfx", "音效音量 (SFX):", 24, Color.white, new Vector2(-220, 15), new Vector2(320, 45), font, FontStyle.Bold);
+        sliderSfxVolume = CreateSlider(panel.transform, "Slider_Sfx", new Vector2(70, 15), new Vector2(240, 26), 0f, 1f, PlayerPrefs.GetFloat("SFX_Volume", 0.5f));
+        txtSfxVolume = CreateText(panel.transform, "Txt_SfxVal", $"{sliderSfxVolume.value * 100f:F0}%", 24, Color.cyan, new Vector2(250, 15), new Vector2(90, 45), font, FontStyle.Bold);
+        sliderSfxVolume.onValueChanged.AddListener(OnInGameSfxChanged);
+
+        // --- 全螢幕切換 ---
+        CreateText(panel.transform, "Lbl_Screen", "顯示模式 (DISPLAY):", 24, Color.white, new Vector2(-220, -50), new Vector2(320, 45), font, FontStyle.Bold);
+        bool isFull = Screen.fullScreen;
+        GameObject btnFsObj = CreateStyledButton(panel.transform, "Btn_ToggleFullscreen", isFull ? "全螢幕 [開啟 ON]" : "全螢幕 [視窗 WINDOW]", new Vector2(160, -50), new Vector2(270, 50), 22, font);
+        Button btnFs = btnFsObj.GetComponent<Button>();
+        txtFullscreenState = btnFsObj.GetComponentInChildren<Text>();
+        btnFs.onClick.AddListener(ToggleInGameFullscreen);
+
+        // --- 返回按鈕 ---
+        CreateStyledButton(panel.transform, "Btn_BackFromSettings", "⬅ 返回暫停選單 (BACK)", new Vector2(0, -145), new Vector2(400, 58), 26, font);
+
+        panel.SetActive(false);
+        return panel;
+    }
+
+    Slider CreateSlider(Transform parent, string name, Vector2 pos, Vector2 size, float min, float max, float def)
+    {
+        GameObject sliderObj = new GameObject(name);
+        sliderObj.transform.SetParent(parent, false);
+        Slider slider = sliderObj.AddComponent<Slider>();
+        slider.minValue = min; slider.maxValue = max; slider.value = def;
+
+        RectTransform sRect = sliderObj.GetComponent<RectTransform>();
+        sRect.anchoredPosition = pos; sRect.sizeDelta = size;
+
+        GameObject bg = new GameObject("Background");
+        bg.transform.SetParent(sliderObj.transform, false);
+        Image bgImg = bg.AddComponent<Image>();
+        bgImg.color = new Color(0.12f, 0.16f, 0.25f, 0.9f);
+        bgImg.raycastTarget = false;
+        RectTransform bgRect = bg.GetComponent<RectTransform>();
+        bgRect.anchorMin = Vector2.zero; bgRect.anchorMax = Vector2.one; bgRect.sizeDelta = Vector2.zero;
+
+        GameObject fillArea = new GameObject("Fill Area");
+        fillArea.transform.SetParent(sliderObj.transform, false);
+        RectTransform faRect = fillArea.AddComponent<RectTransform>();
+        faRect.anchorMin = Vector2.zero; faRect.anchorMax = Vector2.one; faRect.sizeDelta = Vector2.zero;
+
+        GameObject fill = new GameObject("Fill");
+        fill.transform.SetParent(fillArea.transform, false);
+        Image fillImg = fill.AddComponent<Image>();
+        fillImg.color = new Color(0f, 0.75f, 1f);
+        fillImg.raycastTarget = false;
+        RectTransform fillRect = fill.GetComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero; fillRect.anchorMax = Vector2.one; fillRect.sizeDelta = Vector2.zero;
+        slider.fillRect = fillRect;
+
+        GameObject handleArea = new GameObject("Handle Slide Area");
+        handleArea.transform.SetParent(sliderObj.transform, false);
+        RectTransform haRect = handleArea.AddComponent<RectTransform>();
+        haRect.anchorMin = Vector2.zero; haRect.anchorMax = Vector2.one; haRect.sizeDelta = Vector2.zero;
+
+        GameObject handle = new GameObject("Handle");
+        handle.transform.SetParent(handleArea.transform, false);
+        Image handleImg = handle.AddComponent<Image>();
+        handleImg.color = Color.white;
+        handleImg.raycastTarget = true;
+        RectTransform handleRect = handle.GetComponent<RectTransform>();
+        handleRect.sizeDelta = new Vector2(24, 0);
+        slider.handleRect = handleRect;
+
+        return slider;
+    }
+
+    void OnInGameBgmChanged(float val)
+    {
+        if (txtBgmVolume != null) txtBgmVolume.text = $"{val * 100f:F0}%";
+        AudioManager.Instance?.SetBgmVolume(val);
+        PlayerPrefs.SetFloat("BGM_Volume", val);
+    }
+
+    void OnInGameSfxChanged(float val)
+    {
+        if (txtSfxVolume != null) txtSfxVolume.text = $"{val * 100f:F0}%";
+        AudioManager.Instance?.SetSfxVolume(val);
+        PlayerPrefs.SetFloat("SFX_Volume", val);
+    }
+
+    void ToggleInGameFullscreen()
+    {
+        bool newFull = !Screen.fullScreen;
+        Screen.fullScreen = newFull;
+        PlayerPrefs.SetInt("Screen_Fullscreen", newFull ? 1 : 0);
+        PlayerPrefs.Save();
+        if (txtFullscreenState != null)
+        {
+            txtFullscreenState.text = newFull ? "全螢幕 [開啟 ON]" : "全螢幕 [視窗 WINDOW]";
+        }
+    }
+
+    public void OpenInGameSettings()
+    {
+        if (pausePanel != null) pausePanel.SetActive(false);
+        if (inGameSettingsPanel != null)
+        {
+            if (sliderBgmVolume != null) sliderBgmVolume.value = PlayerPrefs.GetFloat("BGM_Volume", 0.5f);
+            if (sliderSfxVolume != null) sliderSfxVolume.value = PlayerPrefs.GetFloat("SFX_Volume", 0.5f);
+            if (txtFullscreenState != null) txtFullscreenState.text = Screen.fullScreen ? "全螢幕 [開啟 ON]" : "全螢幕 [視窗 WINDOW]";
+            inGameSettingsPanel.transform.SetAsLastSibling();
+            inGameSettingsPanel.SetActive(true);
+        }
+    }
+
+    public void CloseInGameSettings()
+    {
+        if (inGameSettingsPanel != null) inGameSettingsPanel.SetActive(false);
+        if (pausePanel != null)
+        {
+            pausePanel.transform.SetAsLastSibling();
+            pausePanel.SetActive(true);
+        }
+        PlayerPrefs.Save();
+    }
+
+    void EnsurePausePanelButtons(GameObject panel, Font font)
     {
         if (panel == null) return;
         Transform tResume = panel.transform.Find("Btn_Resume");
+        Transform tSettings = panel.transform.Find("Btn_Settings");
+        Transform tRestart = panel.transform.Find("Btn_Restart");
+        Transform tMainMenu = panel.transform.Find("Btn_MainMenu");
+
+        if (tResume != null)
+        {
+            RectTransform rt = tResume.GetComponent<RectTransform>();
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, 45); rt.sizeDelta = new Vector2(440, 58); }
+        }
+
+        if (tSettings == null)
+        {
+            CreateStyledButton(panel.transform, "Btn_Settings", "⚙ 遊戲設定 (SETTINGS)", new Vector2(0, -25), new Vector2(440, 58), 26, font);
+        }
+        else
+        {
+            RectTransform rt = tSettings.GetComponent<RectTransform>();
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -25); rt.sizeDelta = new Vector2(440, 58); }
+        }
+
+        if (tRestart != null)
+        {
+            RectTransform rt = tRestart.GetComponent<RectTransform>();
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -95); rt.sizeDelta = new Vector2(440, 58); }
+        }
+
+        if (tMainMenu != null)
+        {
+            RectTransform rt = tMainMenu.GetComponent<RectTransform>();
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -165); rt.sizeDelta = new Vector2(440, 58); }
+        }
+    }
+
+    void EnsureGameOverPanelButtons(GameObject panel, Font font)
+    {
+        if (panel == null) return;
         Transform tRestart = panel.transform.Find("Btn_Restart");
         Transform tMainMenu = panel.transform.Find("Btn_MainMenu");
 
@@ -300,6 +521,44 @@ public class RollingSkyGameManager : MonoBehaviour
         if (tMainMenu == null)
         {
             CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -140), new Vector2(400, 65), 28, font);
+        }
+    }
+
+    void EnsureVictoryPanelButtons(GameObject panel, Font font)
+    {
+        if (panel == null) return;
+        Transform tNext = panel.transform.Find("Btn_NextLevel");
+        Transform tRestart = panel.transform.Find("Btn_Restart");
+        Transform tMainMenu = panel.transform.Find("Btn_MainMenu");
+
+        if (tNext == null)
+        {
+            CreateStyledButton(panel.transform, "Btn_NextLevel", "⏩ 前往下一關 (NEXT LEVEL)", new Vector2(0, -10), new Vector2(440, 60), 28, font);
+        }
+        else
+        {
+            RectTransform rt = tNext.GetComponent<RectTransform>();
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -10); rt.sizeDelta = new Vector2(440, 60); }
+        }
+
+        if (tRestart == null)
+        {
+            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -80), new Vector2(440, 60), 28, font);
+        }
+        else
+        {
+            RectTransform rt = tRestart.GetComponent<RectTransform>();
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -80); rt.sizeDelta = new Vector2(440, 60); }
+        }
+
+        if (tMainMenu == null)
+        {
+            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -150), new Vector2(440, 60), 28, font);
+        }
+        else
+        {
+            RectTransform rt = tMainMenu.GetComponent<RectTransform>();
+            if (rt != null) { rt.anchoredPosition = new Vector2(0, -150); rt.sizeDelta = new Vector2(440, 60); }
         }
     }
 
@@ -379,8 +638,14 @@ public class RollingSkyGameManager : MonoBehaviour
         if (pausePanel != null)
         {
             BindButton(pausePanel, "Btn_Resume", ResumeGame);
+            BindButton(pausePanel, "Btn_Settings", OpenInGameSettings);
             BindButton(pausePanel, "Btn_Restart", RestartLevel);
             BindButton(pausePanel, "Btn_MainMenu", ReturnToMainMenu);
+        }
+
+        if (inGameSettingsPanel != null)
+        {
+            BindButton(inGameSettingsPanel, "Btn_BackFromSettings", CloseInGameSettings);
         }
 
         if (gameOverPanel != null)
@@ -391,9 +656,25 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (victoryPanel != null)
         {
+            BindButton(victoryPanel, "Btn_NextLevel", GoToNextLevel);
             BindButton(victoryPanel, "Btn_Restart", RestartLevel);
             BindButton(victoryPanel, "Btn_MainMenu", ReturnToMainMenu);
         }
+    }
+
+    public void GoToNextLevel()
+    {
+        int currentLevel = PlayerPrefs.GetInt("SelectedLevel", 1);
+        int nextLevel = currentLevel + 1;
+        if (nextLevel > 10) nextLevel = 10;
+
+        PlayerPrefs.SetInt("SelectedLevel", nextLevel);
+        PlayerPrefs.SetInt("IsEndlessMode", 0);
+        PlayerPrefs.SetInt("IsBuilderMode", 0);
+        PlayerPrefs.Save();
+
+        Time.timeScale = 1.0f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     void BindButton(GameObject parent, string btnName, UnityAction action)
@@ -541,6 +822,7 @@ public class RollingSkyGameManager : MonoBehaviour
         isVictory = true;
 
         if (pausePanel != null) pausePanel.SetActive(false);
+        if (inGameSettingsPanel != null) inGameSettingsPanel.SetActive(false);
 
         // 標記本關卡已通關
         int currentLevel = PlayerPrefs.GetInt("SelectedLevel", 1);
@@ -553,7 +835,25 @@ public class RollingSkyGameManager : MonoBehaviour
             if (subT != null)
             {
                 Text t = subT.GetComponent<Text>();
-                if (t != null) t.text = $"恭喜征服第 {currentLevel} 關！晶彩跳躍，勢不可擋！";
+                if (t != null)
+                {
+                    if (currentLevel >= 10)
+                        t.text = "🏆 恭喜征服第 10 關！通關全系列所有關卡！你是真正的球王！";
+                    else
+                        t.text = $"恭喜征服第 {currentLevel} 關！晶彩跳躍，勢不可擋！";
+                }
+            }
+
+            Transform tNext = victoryPanel.transform.Find("Btn_NextLevel");
+            if (tNext != null)
+            {
+                bool canGoNext = (currentLevel < 10) && !isEndlessMode;
+                tNext.gameObject.SetActive(canGoNext);
+                Text nextText = tNext.GetComponentInChildren<Text>();
+                if (nextText != null)
+                {
+                    nextText.text = $"⏩ 前往第 {currentLevel + 1} 關 (NEXT LEVEL)";
+                }
             }
 
             victoryPanel.transform.SetAsLastSibling();

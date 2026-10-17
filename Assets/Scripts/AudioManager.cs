@@ -41,9 +41,9 @@ public class AudioManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        // 讀取音量設定 (相容 BGM_Volume 與 SFX_Volume)
-        float bgmVol = PlayerPrefs.GetFloat("BGM_Volume", 0.7f);
-        float sfxVol = PlayerPrefs.GetFloat("SFX_Volume", 0.8f);
+        // 讀取音量設定 (相容 BGM_Volume 與 SFX_Volume，預設 50%)
+        float bgmVol = PlayerPrefs.GetFloat("BGM_Volume", 0.5f);
+        float sfxVol = PlayerPrefs.GetFloat("SFX_Volume", 0.5f);
 
         if (bgmSource == null)
         {
