@@ -93,15 +93,19 @@ public class RollingSkyCamera : MonoBehaviour
         if (Time.timeScale > 0.001f)
         {
             // 1. 滑鼠轉動視角 (Mouse X 控制水平環繞 Yaw，Mouse Y 控制垂直俯仰 Pitch)
-            float mouseX = Input.GetAxis("Mouse X");
-            float mouseY = Input.GetAxis("Mouse Y");
-            if (Mathf.Abs(mouseX) > 0.0001f)
+            // 僅在游標鎖定狀態（正常遊戲中）響應滑鼠旋轉，避免在選單/結算彈窗誤觸相機旋轉
+            if (Cursor.lockState == CursorLockMode.Locked)
             {
-                yaw += mouseX * cameraSensitivity * 2.2f;
-            }
-            if (Mathf.Abs(mouseY) > 0.0001f)
-            {
-                pitch -= mouseY * cameraSensitivity * 1.8f;
+                float mouseX = Input.GetAxis("Mouse X");
+                float mouseY = Input.GetAxis("Mouse Y");
+                if (Mathf.Abs(mouseX) > 0.0001f)
+                {
+                    yaw += mouseX * cameraSensitivity * 2.2f;
+                }
+                if (Mathf.Abs(mouseY) > 0.0001f)
+                {
+                    pitch -= mouseY * cameraSensitivity * 1.8f;
+                }
             }
 
             // 2. Arduino 雙軸實體搖桿視角控制 (中位值約 500)

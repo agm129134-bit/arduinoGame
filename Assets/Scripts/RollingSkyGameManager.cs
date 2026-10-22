@@ -87,6 +87,13 @@ public class RollingSkyGameManager : MonoBehaviour
         Time.timeScale = 1.0f;
     }
 
+    void OnDisable()
+    {
+        // 離開場景或組件禁用時，恢復游標狀態
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
     void Start()
     {
         isBuilderMode = (PlayerPrefs.GetInt("IsBuilderMode", 0) == 1);
@@ -95,6 +102,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (isBuilderMode)
         {
+            SetCursorLocked(false);
             // 進入自訂建造模式：隱藏常規跑酷 HUD 與預設小球
             if (ball == null)
             {
@@ -140,6 +148,9 @@ public class RollingSkyGameManager : MonoBehaviour
         BindAllButtonsRuntime();
 
         UpdateGemUI();
+
+        // 鎖定並隱藏滑鼠游標，防止游標滑出視窗並提升遊玩沉浸感
+        SetCursorLocked(true);
     }
 
     void EnsureTrackGenerator()
@@ -157,6 +168,9 @@ public class RollingSkyGameManager : MonoBehaviour
         totalGemsInLevel = FindObjectsByType<GemCollectible>(FindObjectsSortMode.None).Length;
         if (ball != null) startZ = ball.position.z;
         UpdateGemUI();
+
+        // 鎖定並隱藏滑鼠游標，防止游標滑出視窗並提升遊玩沉浸感
+        SetCursorLocked(true);
     }
 
     void Update()
@@ -167,6 +181,18 @@ public class RollingSkyGameManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F2)) AddDebugGems(500);
 
         if (isBuilderMode) return; // 建造模式由 TrackBuilderManager 掌管輸入
+
+        // 正常遊戲狀態下若游標未鎖定，玩家點擊視窗時自動重新鎖定游標
+        if (!isPaused && !isGameOver && !isVictory)
+        {
+            if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1))
+            {
+                if (Cursor.lockState != CursorLockMode.Locked || Cursor.visible)
+                {
+                    SetCursorLocked(true);
+                }
+            }
+        }
 
         // 快速重開鍵
         if (Input.GetKeyDown(KeyCode.R))
@@ -222,6 +248,39 @@ public class RollingSkyGameManager : MonoBehaviour
         Debug.Log($"💎 [Debug] 寶石已增加 {count}！當前累計總寶石: {totalGems}");
     }
 
+    // --- 游標鎖定與隱藏控制 ---
+    public void SetCursorLocked(bool locked)
+    {
+        if (isBuilderMode)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            return;
+        }
+
+        if (locked)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+    }
+
+    void OnApplicationFocus(bool hasFocus)
+    {
+        if (hasFocus)
+        {
+            if (!isPaused && !isGameOver && !isVictory && !isBuilderMode)
+            {
+                SetCursorLocked(true);
+            }
+        }
+    }
+
     // --- 暫停管理 (含自動容錯建立與即時設定支援) ---
     public void TogglePause()
     {
@@ -253,6 +312,9 @@ public class RollingSkyGameManager : MonoBehaviour
             inGameSettingsPanel.SetActive(false);
         }
 
+        // 暫停時解除鎖定並顯示游標以供 UI 操作；繼續遊戲時隱藏並鎖定游標防滑出視窗
+        SetCursorLocked(!isPaused);
+
         Debug.Log(isPaused ? "[GameManager] 遊戲已暫停 (PAUSED)" : "[GameManager] 遊戲已繼續 (RESUMED)");
     }
 
@@ -262,18 +324,21 @@ public class RollingSkyGameManager : MonoBehaviour
         Time.timeScale = 1.0f;
         if (pausePanel != null) pausePanel.SetActive(false);
         if (inGameSettingsPanel != null) inGameSettingsPanel.SetActive(false);
+        SetCursorLocked(true);
     }
 
     // --- 場景導航 ---
     public void RestartLevel()
     {
         Time.timeScale = 1.0f;
+        SetCursorLocked(false);
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     public void ReturnToMainMenu()
     {
         Time.timeScale = 1.0f;
+        SetCursorLocked(false);
         SceneManager.LoadScene("MainMenuScene");
     }
 
@@ -1195,6 +1260,7 @@ public class RollingSkyGameManager : MonoBehaviour
         PlayerPrefs.Save();
 
         Time.timeScale = 1.0f;
+        SetCursorLocked(false);
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
@@ -1349,6 +1415,7 @@ public class RollingSkyGameManager : MonoBehaviour
         }
 
         isGameOver = true;
+        SetCursorLocked(false);
 
         if (pausePanel != null) pausePanel.SetActive(false);
 
@@ -1406,6 +1473,7 @@ public class RollingSkyGameManager : MonoBehaviour
     {
         if (isGameOver || isVictory) return;
         isVictory = true;
+        SetCursorLocked(false);
 
         if (pausePanel != null) pausePanel.SetActive(false);
         if (inGameSettingsPanel != null) inGameSettingsPanel.SetActive(false);

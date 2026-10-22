@@ -101,11 +101,33 @@ public class RollingSkyMenuManager : MonoBehaviour
 
     void Awake()
     {
+        // 進入主選單確保游標恢復可見且不鎖定
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
         if (arduino == null) arduino = FindAnyObjectByType<ArduinoReceiver>();
+    }
+
+    void OnEnable()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    void OnApplicationFocus(bool hasFocus)
+    {
+        if (hasFocus)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
     }
 
     void Start()
     {
+        // 確保游標完全解鎖與可見以供玩家點選 UI
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
         // 確保 EventSystem 存在且擁有輸入模組
         if (EventSystem.current == null)
         {

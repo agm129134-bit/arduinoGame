@@ -131,6 +131,8 @@ public class TrackBuilderManager : MonoBehaviour
         if (starGate != null) Destroy(starGate);
 
         // 預設全空畫布，讓玩家從零自由建造，不強制預填任何方塊
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
         LoadSavedTrack();
         CreateVisualGrid();
         CreateCursor();
@@ -421,6 +423,8 @@ public class TrackBuilderManager : MonoBehaviour
 
         SaveTrack();
         isEditMode = false;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
         if (cursorVisual != null) cursorVisual.SetActive(false);
         if (builderUIPanel != null) builderUIPanel.SetActive(false);
 
@@ -455,6 +459,8 @@ public class TrackBuilderManager : MonoBehaviour
     {
         isEditMode = true;
         Time.timeScale = 1.0f; // 確保時間尺度正常
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
 
         if (cursorVisual != null) cursorVisual.SetActive(true);
         if (builderUIPanel != null) builderUIPanel.SetActive(true);
@@ -576,6 +582,8 @@ public class TrackBuilderManager : MonoBehaviour
         SaveTrack();
         PlayerPrefs.SetInt("IsBuilderMode", 0);
         PlayerPrefs.Save();
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
         SceneManager.LoadScene("MainMenuScene");
     }
 
