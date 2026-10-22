@@ -33,7 +33,12 @@ public class RollingSkyBallController : MonoBehaviour
     private bool isDead = false;
     private float currentHorizontalInput = 0f;
     private bool isEndlessMode = false;
+    private bool isSkyTowerMode = false;
     private float baseForwardSpeed = 12.0f;
+    private float currentForwardInput = 0f;
+    private float lastUltrasonicDist = 50f;
+    private float ultrasonicJumpCooldown = 0f;
+    private Vector3 skyTowerSpawnPos = new Vector3(0, 1.5f, -4f);
 
     void Awake()
     {
@@ -56,25 +61,40 @@ public class RollingSkyBallController : MonoBehaviour
 
     private KeyCode customKeyLeft = KeyCode.A;
     private KeyCode customKeyRight = KeyCode.D;
+    private KeyCode customKeyJump = KeyCode.Space;
 
     void Start()
     {
         if (arduino == null) arduino = FindAnyObjectByType<ArduinoReceiver>();
 
         // 載入玩家自訂鍵盤按鍵與靈敏度
-        customKeyLeft = (KeyCode)PlayerPrefs.GetInt("Key_Left", (int)KeyCode.A);
-        customKeyRight = (KeyCode)PlayerPrefs.GetInt("Key_Right", (int)KeyCode.D);
-        horizontalSpeed = PlayerPrefs.GetFloat("Keyboard_Speed", 9.0f);
-
-        // 載入控制器靈敏度與死區
-        tiltSensitivity = PlayerPrefs.GetFloat("Tilt_Sensitivity", 1.8f);
-        tiltDeadzone = PlayerPrefs.GetFloat("Tilt_Deadzone", 0.08f);
+        ReloadSettings();
 
         isEndlessMode = (PlayerPrefs.GetInt("IsEndlessMode", 0) == 1);
+        isSkyTowerMode = (PlayerPrefs.GetInt("IsSkyTowerMode", 0) == 1);
         baseForwardSpeed = forwardSpeed;
+
+        if (isSkyTowerMode)
+        {
+            transform.position = skyTowerSpawnPos;
+            if (rb != null) rb.linearVelocity = Vector3.zero;
+        }
 
         // 裝備已購買解鎖之球體皮膚與拖尾光效
         ApplyEquippedSkin();
+    }
+
+    /// <summary>
+    /// 即時重新載入最新鍵位與靈敏度 (供暫停設定面板修改後立即生效)
+    /// </summary>
+    public void ReloadSettings()
+    {
+        customKeyLeft = (KeyCode)PlayerPrefs.GetInt("Key_Left", (int)KeyCode.A);
+        customKeyRight = (KeyCode)PlayerPrefs.GetInt("Key_Right", (int)KeyCode.D);
+        customKeyJump = (KeyCode)PlayerPrefs.GetInt("Key_Jump", (int)KeyCode.Space);
+        horizontalSpeed = PlayerPrefs.GetFloat("Keyboard_Speed", 9.0f);
+        tiltSensitivity = PlayerPrefs.GetFloat("Tilt_Sensitivity", 1.8f);
+        tiltDeadzone = PlayerPrefs.GetFloat("Tilt_Deadzone", 0.08f);
     }
 
     /// <summary>
@@ -157,10 +177,28 @@ public class RollingSkyBallController : MonoBehaviour
         if (coyoteTimer > 0f) coyoteTimer -= Time.deltaTime;
         if (jumpBufferTimer > 0f) jumpBufferTimer -= Time.deltaTime;
 
-        // 若玩家按下 Space 或跳躍自訂鍵，記錄進跳躍緩衝 (150ms 窗口)
-        if (Input.GetKeyDown(KeyCode.Space))
+        // 若玩家按下 Space 或自訂跳躍鍵，記錄進跳躍緩衝 (150ms 窗口)
+        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(customKeyJump))
         {
             jumpBufferTimer = jumpBufferTime;
+        }
+
+        // 超音波手勢跳躍：手持實體裝置朝電腦螢幕往前推進跳躍
+        if (arduino != null)
+        {
+            if (ultrasonicJumpCooldown > 0f) ultrasonicJumpCooldown -= Time.deltaTime;
+
+            float dist = arduino.distance;
+            float jumpThresh = PlayerPrefs.GetFloat("Jump_Distance", 20.0f);
+            float delta = dist - lastUltrasonicDist;
+
+            // 推進手勢檢測：距離快速縮小 (delta < -8) 或達到門檻 (dist < jumpThresh)
+            if ((delta < -8.0f || (dist <= jumpThresh && lastUltrasonicDist > jumpThresh + 1.5f)) && ultrasonicJumpCooldown <= 0f)
+            {
+                jumpBufferTimer = jumpBufferTime;
+                ultrasonicJumpCooldown = 0.4f;
+            }
+            lastUltrasonicDist = Mathf.Lerp(lastUltrasonicDist, dist, Time.deltaTime * 10f);
         }
 
         // 當處於跳躍緩衝期且具備起跳條件時，立即起跳！
@@ -175,10 +213,23 @@ public class RollingSkyBallController : MonoBehaviour
             forwardSpeed = baseForwardSpeed + Mathf.Min(10.0f, (transform.position.z / 100f) * 1.2f);
         }
 
-        // 掉落深淵判定
-        if (transform.position.y < -5.0f)
+        // 掉落深淵判定 (天梯模式採硬派墜落重爬，常規模式死亡)
+        if (isSkyTowerMode)
         {
-            Die("墜落虛空深淵！");
+            if (transform.position.y < -15.0f)
+            {
+                // 硬派 Only Up：跌入最底層虛空，傳送回 0 米起點重新攀登！
+                transform.position = skyTowerSpawnPos;
+                if (rb != null) rb.linearVelocity = Vector3.zero;
+                AudioManager.Instance?.PlayFall();
+            }
+        }
+        else
+        {
+            if (transform.position.y < -5.0f)
+            {
+                Die("墜落虛空深淵！");
+            }
         }
     }
 
@@ -186,14 +237,42 @@ public class RollingSkyBallController : MonoBehaviour
     {
         if (isDead) return;
 
-        // 計算水平速度 (結合鍵盤與 MPU-6050 陀螺儀)
-        float targetVx = currentHorizontalInput * horizontalSpeed;
+        if (isSkyTowerMode)
+        {
+            // 通天天梯：依相機視角水平朝向前後左右移動 (玩家視角轉向哪裡，前推就往哪裡跑)
+            Vector3 camForward = Vector3.forward;
+            Vector3 camRight = Vector3.right;
+            if (Camera.main != null)
+            {
+                camForward = Camera.main.transform.forward;
+                camForward.y = 0f;
+                if (camForward.sqrMagnitude > 0.001f) camForward.Normalize();
 
-        // 保持穩定的向前速度與自由的垂直重力 (Unity 6 linearVelocity)
-        Vector3 vel = rb.linearVelocity;
-        vel.x = targetVx;
-        vel.z = forwardSpeed;
-        rb.linearVelocity = vel;
+                camRight = Camera.main.transform.right;
+                camRight.y = 0f;
+                if (camRight.sqrMagnitude > 0.001f) camRight.Normalize();
+            }
+
+            Vector3 moveDir = (camForward * currentForwardInput + camRight * currentHorizontalInput);
+            if (moveDir.sqrMagnitude > 1f) moveDir.Normalize();
+
+            Vector3 targetVel = moveDir * horizontalSpeed;
+
+            Vector3 vel = rb.linearVelocity;
+            vel.x = Mathf.MoveTowards(vel.x, targetVel.x, 35f * Time.fixedDeltaTime);
+            vel.z = Mathf.MoveTowards(vel.z, targetVel.z, 35f * Time.fixedDeltaTime);
+            rb.linearVelocity = vel;
+        }
+        else
+        {
+            // 常規跑酷：計算水平速度與固定向前速度
+            float targetVx = currentHorizontalInput * horizontalSpeed;
+
+            Vector3 vel = rb.linearVelocity;
+            vel.x = targetVx;
+            vel.z = forwardSpeed;
+            rb.linearVelocity = vel;
+        }
     }
 
     void ReadInputs()
@@ -202,7 +281,12 @@ public class RollingSkyBallController : MonoBehaviour
         if (Input.GetKey(customKeyLeft) || Input.GetKey(KeyCode.LeftArrow)) keyboardInput -= 1f;
         if (Input.GetKey(customKeyRight) || Input.GetKey(KeyCode.RightArrow)) keyboardInput += 1f;
 
+        float forwardKb = 0f;
+        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) forwardKb += 1f;
+        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) forwardKb -= 1f;
+
         float tiltInput = 0f;
+        float pitchInput = 0f;
         if (arduino != null)
         {
             // MPU-6050 X軸加速度代表左右傾角
@@ -211,17 +295,18 @@ public class RollingSkyBallController : MonoBehaviour
             {
                 tiltInput = Mathf.Clamp(rawTilt * tiltSensitivity, -1f, 1f);
             }
+
+            // MPU-6050 Y軸加速度代表前後傾角 (前傾往前跑，後傾往後跑)
+            float rawPitch = arduino.acceleration.y;
+            if (Mathf.Abs(rawPitch) > tiltDeadzone)
+            {
+                pitchInput = Mathf.Clamp(rawPitch * tiltSensitivity, -1f, 1f);
+            }
         }
 
-        // 雙軌融合：硬體有數值時疊加，或鍵盤優先
-        if (Mathf.Abs(keyboardInput) > 0.01f)
-        {
-            currentHorizontalInput = keyboardInput;
-        }
-        else
-        {
-            currentHorizontalInput = tiltInput;
-        }
+        // 雙軌融合：鍵盤或硬體體感
+        currentHorizontalInput = (Mathf.Abs(keyboardInput) > 0.01f) ? keyboardInput : tiltInput;
+        currentForwardInput = (Mathf.Abs(forwardKb) > 0.01f) ? forwardKb : pitchInput;
     }
 
     void CheckGrounded()
@@ -284,7 +369,14 @@ public class RollingSkyBallController : MonoBehaviour
 
         Vector3 vel = rb.linearVelocity;
         vel.y = launchForce;
-        vel.z = forwardSpeed * forwardBoost;
+        if (!isSkyTowerMode)
+        {
+            vel.z = forwardSpeed * forwardBoost;
+        }
+        else
+        {
+            if (Mathf.Abs(currentForwardInput) > 0.1f) vel.z = currentForwardInput * forwardSpeed * 1.2f;
+        }
         rb.linearVelocity = vel;
         isGrounded = false;
         coyoteTimer = 0f;

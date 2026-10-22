@@ -45,6 +45,8 @@ public class RollingSkyMenuManager : MonoBehaviour
     public Text txtKeyJump;
     public Slider sliderKeyboardSpeed;
     public Text txtKeyboardSpeed;
+    public Slider sliderMouseSensitivity;
+    public Text txtMouseSensitivity;
 
     [Header("Controller Settings UI")]
     public InputField comPortInput;
@@ -54,6 +56,8 @@ public class RollingSkyMenuManager : MonoBehaviour
     public Text txtTiltDeadzone;
     public Slider sliderJumpDistance;
     public Text txtJumpDistance;
+    public Slider sliderCamSensitivity;
+    public Text txtCamSensitivity;
     public Text hardwareStatusText;
 
     [Header("Audio Settings UI")]
@@ -182,6 +186,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         BindButton(mainMenuPanel, "Btn_Start", OnStartGame);
         BindButton(mainMenuPanel, "Btn_Levels", OnOpenLevelSelect);
         BindButton(mainMenuPanel, "Btn_Endless", OnOpenEndlessMode);
+        BindButton(mainMenuPanel, "Btn_SkyTower", OnOpenSkyTowerMode);
         BindButton(mainMenuPanel, "Btn_Builder", OnOpenTrackBuilder);
         BindButton(mainMenuPanel, "Btn_Shop", OnOpenShop);
         BindButton(mainMenuPanel, "Btn_Settings", OnOpenSettings);
@@ -342,6 +347,13 @@ public class RollingSkyMenuManager : MonoBehaviour
                 if (txtJumpDistance != null) txtJumpDistance.text = $"{v:F0} cm";
             });
         }
+        if (sliderCamSensitivity != null)
+        {
+            sliderCamSensitivity.onValueChanged.RemoveAllListeners();
+            sliderCamSensitivity.onValueChanged.AddListener(v => {
+                if (txtCamSensitivity != null) txtCamSensitivity.text = $"{v:F1}x";
+            });
+        }
 
         // 音訊設定按鈕與滑桿
         if (btnBgmTrack0 != null)
@@ -495,17 +507,18 @@ public class RollingSkyMenuManager : MonoBehaviour
         Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-        // 重新排版主選單按鈕，分為左右兩大功能面板，互不干涉重疊
-        // 左側：模式選擇
-        RepositionButton(mainMenuPanel, "Btn_Start", "開始第一關 (START GAME)", new Vector2(-220, 70), new Vector2(400, 70), 30, font);
-        RepositionButton(mainMenuPanel, "Btn_Levels", "選擇關卡 (LEVEL SELECT)", new Vector2(-220, -15), new Vector2(400, 70), 30, font);
+        // 重新排版主選單按鈕，分為左右兩大功能面板 (左四個、右四個完美對稱排版，高度70，無重疊)
+        // 左側：四大遊玩模式 (X = -220)
+        RepositionButton(mainMenuPanel, "Btn_Start", "開始第一關 (START GAME)", new Vector2(-220, 70), new Vector2(400, 70), 28, font);
+        RepositionButton(mainMenuPanel, "Btn_Levels", "選擇關卡 (LEVEL SELECT)", new Vector2(-220, -15), new Vector2(400, 70), 28, font);
         RepositionButton(mainMenuPanel, "Btn_Endless", "無盡極限跑酷 (ENDLESS MODE)", new Vector2(-220, -100), new Vector2(400, 70), 26, font);
-        RepositionButton(mainMenuPanel, "Btn_Builder", "自訂場地編輯器 (TRACK BUILDER)", new Vector2(-220, -185), new Vector2(400, 70), 24, font);
+        RepositionButton(mainMenuPanel, "Btn_SkyTower", "通天天梯 (SKY TOWER)", new Vector2(-220, -185), new Vector2(400, 70), 26, font);
 
-        // 右側：系統與商店
+        // 右側：系統、創造與商店 (X = 220)
         RepositionButton(mainMenuPanel, "Btn_Shop", "球體皮膚商店 (SKIN SHOP)", new Vector2(220, 70), new Vector2(400, 70), 28, font);
-        RepositionButton(mainMenuPanel, "Btn_Settings", "系統設定 (SETTINGS)", new Vector2(220, -15), new Vector2(400, 70), 30, font);
-        RepositionButton(mainMenuPanel, "Btn_Exit", "離開遊戲 (EXIT)", new Vector2(220, -100), new Vector2(400, 70), 30, font);
+        RepositionButton(mainMenuPanel, "Btn_Builder", "自訂場地編輯器 (TRACK BUILDER)", new Vector2(220, -15), new Vector2(400, 70), 24, font);
+        RepositionButton(mainMenuPanel, "Btn_Settings", "系統設定 (SETTINGS)", new Vector2(220, -100), new Vector2(400, 70), 30, font);
+        RepositionButton(mainMenuPanel, "Btn_Exit", "離開遊戲 (EXIT)", new Vector2(220, -185), new Vector2(400, 70), 30, font);
 
         // 頂部玩家資產與紀錄看板
         Transform tStatus = mainMenuPanel.transform.Find("PlayerStatusText");
@@ -549,7 +562,8 @@ public class RollingSkyMenuManager : MonoBehaviour
             {
                 int gems = PlayerPrefs.GetInt("TotalGems", 0);
                 int highScore = PlayerPrefs.GetInt("Endless_HighScore", 0);
-                txt.text = $"💎 持有水晶: <color=cyan>{gems}</color>    |    🏆 無盡最高紀錄: <color=yellow>{highScore}</color> 分";
+                int towerHeight = PlayerPrefs.GetInt("SkyTower_BestHeight", 0);
+                txt.text = $"💎 水晶: <color=cyan>{gems}</color>   |   🏆 無盡最高: <color=yellow>{highScore}</color> 分   |   🗼 天梯最高: <color=lime>{towerHeight}m</color>";
             }
         }
     }
@@ -702,7 +716,7 @@ public class RollingSkyMenuManager : MonoBehaviour
             rtKey.anchoredPosition = new Vector2(-140, 310);
             rtKey.sizeDelta = new Vector2(260, 60);
             Text txt = tTabKey.GetComponentInChildren<Text>();
-            if (txt != null) { txt.text = "【 鍵盤 KEYBOARD 】"; txt.fontSize = 21; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
+            if (txt != null) { txt.text = "【 鍵盤 / 滑鼠 KEYBOARD 】"; txt.fontSize = 20; txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow; }
             tabKeyboardBtn = tTabKey.GetComponent<Button>();
         }
 
@@ -794,6 +808,136 @@ public class RollingSkyMenuManager : MonoBehaviour
         {
             audioSettingsPanel = tAudioPanel.gameObject;
             HookAudioUIReferences(audioSettingsPanel);
+        }
+
+        // 5. 重新排版並確保 鍵盤/滑鼠分頁 與 控制器分頁 的靈敏度元件存在，保證完全不重疊
+        RepositionAndEnsureKeyboardUI();
+        RepositionAndEnsureControllerUI();
+    }
+
+    void RepositionAndEnsureKeyboardUI()
+    {
+        if (keyboardSettingsPanel == null) return;
+
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+        // 重新排版 KeyboardSettingsPanel，各行間隔 65px
+        SetChildPos(keyboardSettingsPanel, "LeftLabel", new Vector2(-200, 165));
+        SetChildPos(keyboardSettingsPanel, "Btn_KeyLeft", new Vector2(160, 165));
+
+        SetChildPos(keyboardSettingsPanel, "RightLabel", new Vector2(-200, 100));
+        SetChildPos(keyboardSettingsPanel, "Btn_KeyRight", new Vector2(160, 100));
+
+        SetChildPos(keyboardSettingsPanel, "JumpLabel", new Vector2(-200, 35));
+        SetChildPos(keyboardSettingsPanel, "Btn_KeyJump", new Vector2(160, 35));
+
+        SetChildPos(keyboardSettingsPanel, "SpeedLabel", new Vector2(-200, -30));
+        SetChildPos(keyboardSettingsPanel, "Slider_KeyboardSpeed", new Vector2(120, -30));
+        SetChildPos(keyboardSettingsPanel, "Txt_KeySpeed", new Vector2(290, -30));
+
+        // 確保新增「滑鼠視角靈敏度 (MOUSE LOOK)」
+        Transform tMouseSens = keyboardSettingsPanel.transform.Find("Slider_MouseSens");
+        if (tMouseSens != null)
+        {
+            sliderMouseSensitivity = tMouseSens.GetComponent<Slider>();
+            SetChildPos(keyboardSettingsPanel, "Lbl_MouseSens", new Vector2(-200, -95));
+            SetChildPos(keyboardSettingsPanel, "Slider_MouseSens", new Vector2(120, -95));
+            SetChildPos(keyboardSettingsPanel, "Txt_MouseSensVal", new Vector2(290, -95));
+            Transform tVal = keyboardSettingsPanel.transform.Find("Txt_MouseSensVal");
+            if (tVal != null) txtMouseSensitivity = tVal.GetComponent<Text>();
+        }
+        else
+        {
+            CreateText(keyboardSettingsPanel.transform, "Lbl_MouseSens", "滑鼠視角靈敏度 (MOUSE LOOK):", 24, Color.white, new Vector2(-200, -95), new Vector2(360, 42), font, FontStyle.Bold);
+            sliderMouseSensitivity = CreateSlider(keyboardSettingsPanel.transform, "Slider_MouseSens", new Vector2(120, -95), new Vector2(240, 26), 0.5f, 5.0f, PlayerPrefs.GetFloat("Camera_Sensitivity", 2.0f));
+            txtMouseSensitivity = CreateText(keyboardSettingsPanel.transform, "Txt_MouseSensVal", $"{sliderMouseSensitivity.value:F1}x", 24, Color.cyan, new Vector2(290, -95), new Vector2(90, 42), font, FontStyle.Bold);
+        }
+
+        SetChildPos(keyboardSettingsPanel, "Hint", new Vector2(0, -165));
+
+        if (sliderMouseSensitivity != null)
+        {
+            sliderMouseSensitivity.onValueChanged.RemoveAllListeners();
+            sliderMouseSensitivity.onValueChanged.AddListener(v => {
+                if (txtMouseSensitivity != null) txtMouseSensitivity.text = $"{v:F1}x";
+                if (sliderCamSensitivity != null) sliderCamSensitivity.value = v;
+                PlayerPrefs.SetFloat("Camera_Sensitivity", v);
+            });
+        }
+    }
+
+    void RepositionAndEnsureControllerUI()
+    {
+        if (controllerSettingsPanel == null) return;
+
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+        // 重新排版 ControllerSettingsPanel，嚴格統一行距 60px，徹底避免重疊
+        SetChildPos(controllerSettingsPanel, "PortLabel", new Vector2(-200, 190));
+        SetChildPos(controllerSettingsPanel, "Input_COMPort", new Vector2(150, 190));
+
+        SetChildPos(controllerSettingsPanel, "TiltSensLabel", new Vector2(-200, 130));
+        SetChildPos(controllerSettingsPanel, "Slider_TiltSens", new Vector2(120, 130));
+        SetChildPos(controllerSettingsPanel, "Txt_TiltSens", new Vector2(290, 130));
+
+        SetChildPos(controllerSettingsPanel, "DeadzoneLabel", new Vector2(-200, 70));
+        SetChildPos(controllerSettingsPanel, "Slider_Deadzone", new Vector2(120, 70));
+        SetChildPos(controllerSettingsPanel, "Txt_Deadzone", new Vector2(290, 70));
+
+        // 視角轉向靈敏度放在 Y = 10
+        Transform tSens = controllerSettingsPanel.transform.Find("Slider_CamSensitivity");
+        if (tSens != null)
+        {
+            sliderCamSensitivity = tSens.GetComponent<Slider>();
+            SetChildPos(controllerSettingsPanel, "Lbl_CamSensitivity", new Vector2(-200, 10));
+            SetChildPos(controllerSettingsPanel, "Slider_CamSensitivity", new Vector2(120, 10));
+            SetChildPos(controllerSettingsPanel, "Txt_CamSensVal", new Vector2(290, 10));
+            Transform tVal = controllerSettingsPanel.transform.Find("Txt_CamSensVal");
+            if (tVal != null) txtCamSensitivity = tVal.GetComponent<Text>();
+        }
+        else
+        {
+            CreateText(controllerSettingsPanel.transform, "Lbl_CamSensitivity", "視角轉向靈敏度 (LOOK SENS):", 24, Color.white, new Vector2(-200, 10), new Vector2(360, 42), font, FontStyle.Bold);
+            sliderCamSensitivity = CreateSlider(controllerSettingsPanel.transform, "Slider_CamSensitivity", new Vector2(120, 10), new Vector2(240, 26), 0.5f, 5.0f, PlayerPrefs.GetFloat("Camera_Sensitivity", 2.0f));
+            txtCamSensitivity = CreateText(controllerSettingsPanel.transform, "Txt_CamSensVal", $"{sliderCamSensitivity.value:F1}x", 24, Color.cyan, new Vector2(290, 10), new Vector2(90, 42), font, FontStyle.Bold);
+        }
+
+        SetChildPos(controllerSettingsPanel, "JumpDistLabel", new Vector2(-200, -50));
+        SetChildPos(controllerSettingsPanel, "Slider_JumpDist", new Vector2(120, -50));
+        SetChildPos(controllerSettingsPanel, "Txt_JumpDist", new Vector2(290, -50));
+
+        Transform hwBox = controllerSettingsPanel.transform.Find("HardwareBox");
+        if (hwBox != null)
+        {
+            RectTransform rt = hwBox.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchoredPosition = new Vector2(0, -150);
+                rt.sizeDelta = new Vector2(860, 95);
+            }
+        }
+
+        if (sliderCamSensitivity != null)
+        {
+            sliderCamSensitivity.onValueChanged.RemoveAllListeners();
+            sliderCamSensitivity.onValueChanged.AddListener(v => {
+                if (txtCamSensitivity != null) txtCamSensitivity.text = $"{v:F1}x";
+                if (sliderMouseSensitivity != null) sliderMouseSensitivity.value = v;
+                PlayerPrefs.SetFloat("Camera_Sensitivity", v);
+            });
+        }
+    }
+
+    void SetChildPos(GameObject parent, string childName, Vector2 anchoredPos)
+    {
+        if (parent == null) return;
+        Transform t = parent.transform.Find(childName);
+        if (t != null)
+        {
+            RectTransform rt = t.GetComponent<RectTransform>();
+            if (rt != null) rt.anchoredPosition = anchoredPos;
         }
     }
 
@@ -940,6 +1084,7 @@ public class RollingSkyMenuManager : MonoBehaviour
     {
         ClearEventFocus();
         PlayerPrefs.SetInt("SelectedLevel", 1);
+        PlayerPrefs.SetInt("IsSkyTowerMode", 0);
         PlayerPrefs.SetInt("IsEndlessMode", 0);
         PlayerPrefs.SetInt("IsBuilderMode", 0);
         PlayerPrefs.Save();
@@ -955,6 +1100,17 @@ public class RollingSkyMenuManager : MonoBehaviour
     {
         ClearEventFocus();
         PlayerPrefs.SetInt("IsEndlessMode", 1);
+        PlayerPrefs.SetInt("IsSkyTowerMode", 0);
+        PlayerPrefs.SetInt("IsBuilderMode", 0);
+        PlayerPrefs.Save();
+        SceneManager.LoadScene(gameSceneName);
+    }
+
+    public void OnOpenSkyTowerMode()
+    {
+        ClearEventFocus();
+        PlayerPrefs.SetInt("IsSkyTowerMode", 1);
+        PlayerPrefs.SetInt("IsEndlessMode", 0);
         PlayerPrefs.SetInt("IsBuilderMode", 0);
         PlayerPrefs.Save();
         SceneManager.LoadScene(gameSceneName);
@@ -964,6 +1120,7 @@ public class RollingSkyMenuManager : MonoBehaviour
     {
         ClearEventFocus();
         PlayerPrefs.SetInt("IsBuilderMode", 1);
+        PlayerPrefs.SetInt("IsSkyTowerMode", 0);
         PlayerPrefs.SetInt("IsEndlessMode", 0);
         PlayerPrefs.Save();
         SceneManager.LoadScene(gameSceneName);
@@ -985,6 +1142,7 @@ public class RollingSkyMenuManager : MonoBehaviour
     {
         ClearEventFocus();
         PlayerPrefs.SetInt("SelectedLevel", levelIndex);
+        PlayerPrefs.SetInt("IsSkyTowerMode", 0);
         PlayerPrefs.SetInt("IsEndlessMode", 0);
         PlayerPrefs.SetInt("IsBuilderMode", 0);
         PlayerPrefs.Save();
@@ -1159,6 +1317,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         if (sliderTiltSensitivity != null) PlayerPrefs.SetFloat("Tilt_Sensitivity", sliderTiltSensitivity.value);
         if (sliderTiltDeadzone != null) PlayerPrefs.SetFloat("Tilt_Deadzone", sliderTiltDeadzone.value);
         if (sliderJumpDistance != null) PlayerPrefs.SetFloat("Ultrasonic_Jump_Distance", sliderJumpDistance.value);
+        if (sliderCamSensitivity != null) PlayerPrefs.SetFloat("Camera_Sensitivity", sliderCamSensitivity.value);
 
         PlayerPrefs.SetInt("BGM_Track_Index", currentBgmIndex);
         if (sliderBgmVolume != null) PlayerPrefs.SetFloat("BGM_Volume", sliderBgmVolume.value);
@@ -1192,6 +1351,16 @@ public class RollingSkyMenuManager : MonoBehaviour
         if (sliderTiltSensitivity != null) sliderTiltSensitivity.value = 1.8f;
         if (sliderTiltDeadzone != null) sliderTiltDeadzone.value = 0.08f;
         if (sliderJumpDistance != null) sliderJumpDistance.value = 20.0f;
+        if (sliderCamSensitivity != null)
+        {
+            sliderCamSensitivity.value = 2.0f;
+            if (txtCamSensitivity != null) txtCamSensitivity.text = "2.0x";
+        }
+        if (sliderMouseSensitivity != null)
+        {
+            sliderMouseSensitivity.value = 2.0f;
+            if (txtMouseSensitivity != null) txtMouseSensitivity.text = "2.0x";
+        }
 
         // 3. 音效預設
         currentBgmIndex = 0;
@@ -1285,6 +1454,17 @@ public class RollingSkyMenuManager : MonoBehaviour
         {
             sliderJumpDistance.value = PlayerPrefs.GetFloat("Ultrasonic_Jump_Distance", 20.0f);
             if (txtJumpDistance != null) txtJumpDistance.text = $"{sliderJumpDistance.value:F0} cm";
+        }
+        float camSens = PlayerPrefs.GetFloat("Camera_Sensitivity", 2.0f);
+        if (sliderCamSensitivity != null)
+        {
+            sliderCamSensitivity.value = camSens;
+            if (txtCamSensitivity != null) txtCamSensitivity.text = $"{camSens:F1}x";
+        }
+        if (sliderMouseSensitivity != null)
+        {
+            sliderMouseSensitivity.value = camSens;
+            if (txtMouseSensitivity != null) txtMouseSensitivity.text = $"{camSens:F1}x";
         }
 
         currentBgmIndex = PlayerPrefs.GetInt("BGM_Track_Index", 0);

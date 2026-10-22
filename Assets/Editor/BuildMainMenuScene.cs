@@ -79,16 +79,17 @@ public class BuildMainMenuScene
         CreateText(pMain.transform, "Subtitle", "【極速躍動 3D × Arduino 體感互動跑酷】", 28, new Color(1f, 0.85f, 0.2f), new Vector2(0, 250), new Vector2(900, 50), defaultFont, FontStyle.Normal);
         CreateText(pMain.transform, "PlayerStatusText", "💎 持有水晶: 0    |    🏆 無盡最高紀錄: 0 分", 24, Color.yellow, new Vector2(0, 170), new Vector2(900, 50), defaultFont, FontStyle.Bold);
 
-        // 左欄：核心遊玩模式
+        // 左欄：四大核心遊玩模式 (左四個完美對稱佈局，高度70，無重疊)
         CreateStyledButton(pMain.transform, "Btn_Start", "開始第一關 (START GAME)", new Vector2(-220, 70), new Vector2(400, 70), 28, defaultFont);
         CreateStyledButton(pMain.transform, "Btn_Levels", "選擇關卡 (LEVEL SELECT)", new Vector2(-220, -15), new Vector2(400, 70), 28, defaultFont);
         CreateStyledButton(pMain.transform, "Btn_Endless", "無盡極限跑酷 (ENDLESS MODE)", new Vector2(-220, -100), new Vector2(400, 70), 26, defaultFont);
-        CreateStyledButton(pMain.transform, "Btn_Builder", "自訂場地編輯器 (TRACK BUILDER)", new Vector2(-220, -185), new Vector2(400, 70), 24, defaultFont);
+        CreateStyledButton(pMain.transform, "Btn_SkyTower", "通天天梯 (SKY TOWER)", new Vector2(-220, -185), new Vector2(400, 70), 26, defaultFont);
 
-        // 右欄：系統、商店與退出
+        // 右欄：系統、創造與商店 (右四個完美對稱佈局，高度70，無重疊)
         CreateStyledButton(pMain.transform, "Btn_Shop", "球體皮膚商店 (SKIN SHOP)", new Vector2(220, 70), new Vector2(400, 70), 28, defaultFont);
-        CreateStyledButton(pMain.transform, "Btn_Settings", "系統設定 (SETTINGS)", new Vector2(220, -15), new Vector2(400, 70), 28, defaultFont);
-        CreateStyledButton(pMain.transform, "Btn_Exit", "離開遊戲 (EXIT)", new Vector2(220, -100), new Vector2(400, 70), 30, defaultFont);
+        CreateStyledButton(pMain.transform, "Btn_Builder", "自訂場地編輯器 (TRACK BUILDER)", new Vector2(220, -15), new Vector2(400, 70), 24, defaultFont);
+        CreateStyledButton(pMain.transform, "Btn_Settings", "系統設定 (SETTINGS)", new Vector2(220, -100), new Vector2(400, 70), 28, defaultFont);
+        CreateStyledButton(pMain.transform, "Btn_Exit", "離開遊戲 (EXIT)", new Vector2(220, -185), new Vector2(400, 70), 30, defaultFont);
 
         // ==================== 關卡選擇面板配置 (2x5 網格無重疊) ====================
         CreateText(pLevel.transform, "Title", "SELECT LEVEL (10 大挑戰關卡)", 54, new Color(0f, 1f, 0.9f), new Vector2(0, 360), new Vector2(900, 90), defaultFont, FontStyle.Bold);

@@ -48,6 +48,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         int selectedLevel = PlayerPrefs.GetInt("SelectedLevel", 1);
         bool isEndless = PlayerPrefs.GetInt("IsEndlessMode", 0) == 1;
         bool isBuilder = PlayerPrefs.GetInt("IsBuilderMode", 0) == 1;
+        bool isSkyTower = PlayerPrefs.GetInt("IsSkyTowerMode", 0) == 1;
 
         // 清理場景中任何預設的舊靜態賽道階層（如場景自帶的 --- Track Hierarchy ---）
         GameObject legacyTrack = GameObject.Find("--- Track Hierarchy ---");
@@ -79,6 +80,29 @@ public class RollingSkyTrackGenerator : MonoBehaviour
 
             return;
         }
+        else if (isSkyTower)
+        {
+            // 通天天梯模式：清理舊跑酷物件，建立 500 米立體高塔地圖
+            GetOrCreateTrackRoot(clearExisting: true);
+
+            foreach (var gem in FindObjectsByType<GemCollectible>(FindObjectsSortMode.None))
+            {
+                Destroy(gem.gameObject);
+            }
+            foreach (var pad in FindObjectsByType<JumpPad>(FindObjectsSortMode.None))
+            {
+                Destroy(pad.gameObject);
+            }
+            foreach (var haz in FindObjectsByType<Hazard>(FindObjectsSortMode.None))
+            {
+                Destroy(haz.gameObject);
+            }
+            GameObject gate = GameObject.Find("FinishStarGate");
+            if (gate != null) Destroy(gate);
+
+            EnsureSkyTowerManager();
+            return;
+        }
         else if (isEndless)
         {
             StartEndlessMode();
@@ -86,6 +110,27 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         else
         {
             BuildLevel(selectedLevel);
+        }
+    }
+
+    void EnsureSkyTowerManager()
+    {
+        SkyTowerMapGenerator gen = FindAnyObjectByType<SkyTowerMapGenerator>();
+        if (gen == null)
+        {
+            GameObject genObj = new GameObject("SkyTowerMapGenerator");
+            gen = genObj.AddComponent<SkyTowerMapGenerator>();
+        }
+        gen.BuildTower();
+
+        if (ballTransform != null)
+        {
+            ballTransform.position = new Vector3(0, 1.5f, -4f);
+            Rigidbody rb = ballTransform.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector3.zero;
+            }
         }
     }
 
