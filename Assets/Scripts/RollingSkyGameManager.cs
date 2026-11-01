@@ -204,29 +204,6 @@ public class RollingSkyGameManager : MonoBehaviour
         SetCursorLocked(true);
     }
 
-    /// <summary>
-    /// 全動態刷新當前關卡/通天塔寶石總數（場景中活躍寶石 + 已採集數量）
-    /// 徹底根除動態生成尚未實例化導致 8 / 7 等超額分子/分母異常問題
-    /// </summary>
-    public void RefreshTotalGems()
-    {
-        GemCollectible[] allGems = FindObjectsByType<GemCollectible>(FindObjectsSortMode.None);
-        int activeCount = 0;
-        foreach (var g in allGems)
-        {
-            if (g != null && g.gameObject.activeInHierarchy) activeCount++;
-        }
-        totalGemsInLevel = activeCount + collectedGems;
-        if (totalGemsInLevel < collectedGems) totalGemsInLevel = collectedGems;
-        UpdateGemUI();
-    }
-
-    private System.Collections.IEnumerator DelayedRefreshTotalGems()
-    {
-        yield return null; // 等待一幀讓所有動態地圖生成器 (SkyTower / TrackGenerator) 完成生成
-        RefreshTotalGems();
-    }
-
     void Update()
     {
         // 特殊除錯按鍵：自由增加寶石數量 (G: +50, F1: +100, F2: +500)
