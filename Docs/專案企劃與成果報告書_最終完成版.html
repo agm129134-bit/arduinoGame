@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多功能智慧安全監測與虛實互動體感系統 - 專案企劃與成果報告書 (最終完成版)</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #0f172a;
+            --accent: #f59e0b;
+            --bg-card: #f8fafc;
+            --text-main: #334155;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", "微軟正黑體", sans-serif;
+            line-height: 1.75;
+            color: var(--text-main);
+            background-color: #ffffff;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 50px 60px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+        h1 {
+            color: var(--secondary);
+            font-size: 2.2rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 12px;
+            margin-top: 0;
+        }
+        h2 {
+            color: var(--secondary);
+            font-size: 1.6rem;
+            margin-top: 36px;
+            border-left: 5px solid var(--primary);
+            padding-left: 12px;
+        }
+        h3 {
+            color: var(--primary-dark);
+            font-size: 1.25rem;
+            margin-top: 24px;
+        }
+        h4 {
+            color: var(--secondary);
+            font-size: 1.1rem;
+            margin-top: 18px;
+        }
+        blockquote {
+            background-color: #eff6ff;
+            border-left: 4px solid var(--primary);
+            margin: 20px 0;
+            padding: 14px 20px;
+            border-radius: 0 8px 8px 0;
+            color: #1e40af;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 24px 0;
+            font-size: 0.95rem;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 12px 14px;
+            text-align: left;
+        }
+        th {
+            background-color: #f1f5f9;
+            color: var(--secondary);
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+        code {
+            background-color: #f1f5f9;
+            color: #d97706;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #0f172a;
+            color: #e2e8f0;
+            padding: 18px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+        ul, ol {
+            padding-left: 24px;
+            margin: 12px 0;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        hr {
+            border: 0;
+            height: 1px;
+            background: var(--border);
+            margin: 40px 0;
+        }
+        .badge {
+            display: inline-block;
+            background: var(--primary);
+            color: #fff;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        @media print {
+            body { padding: 0; background: none; }
+            .container { box-shadow: none; border: none; padding: 0; max-width: 100%; }
+            h1, h2, h3 { page-break-after: avoid; }
+            table, pre, blockquote { page-break-inside: avoid; }
+            a { text-decoration: none; color: inherit; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+<pre># 《多功能智慧安全監測與虛實互動體感系統》
+## 專案企劃與成果報告書（最終完成版 v0.9.8）
+
+&gt; **專案代號**：Smart Security &amp; Kinetic 3D Gaming System (Rolling Leap 3D)  
+&gt; **專案團隊**：林安均、卓立凱  
+&gt; **指導領域**：物聯網感測互動、嵌入式系統、Unity 3D 物理引擎、虛實整合遊戲開發  
+&gt; **完成日期**：2026 年 11 月 1 日  
+&gt; **開源代碼儲存庫**：[GitHub - agm129134-bit/arduinoGame](https://github.com/agm129134-bit/arduinoGame)  
+&gt; **最新版本發行**：[Release v0.9.8 免安裝遊戲包](https://github.com/agm129134-bit/arduinoGame/releases/tag/v0.9.8)
+
+---
+
+## 📑 目錄
+
+- [壹、 專案主題發想與核心願景](#壹-專案主題發想與核心願景)
+  - [一、 專案研發背景與動機](#一-專案研發背景與動機)
+  - [二、 核心雙模價值定位：平時為安全哨兵，戰時為體感手把](#二-核心雙模價值定位平時為安全哨兵戰時為體感手把)
+  - [三、 實際應用場景](#三-實際應用場景)
+- [貳、 系統硬體清單與成本規格分析](#貳-系統硬體清單與成本規格分析)
+  - [一、 硬體元件規格清單](#一-硬體元件規格清單)
+  - [二、 實體電路接線與腳位配置](#二-實體電路接線與腳位配置)
+- [參、 系統架構與虛實通訊設計](#參-系統架構與虛實通訊設計)
+  - [一、 系統總體架構方塊圖](#一-系統總體架構方塊圖)
+  - [二、 序列埠串流通訊協定 (Serial Stream Protocol)](#二-序列埠串流通訊協定-serial-stream-protocol)
+  - [三、 感測器訊號處理與核心演算法](#三-感測器訊號處理與核心演算法)
+- [肆、 《極速躍動 3D》虛實整合遊戲核心設計 (v0.9.8)](#肆-極速躍動-3d虛實整合遊戲核心設計-v098)
+  - [一、 3D 物理小球運動學與雙模控制](#一-3d-物理小球運動學與雙模控制)
+  - [二、 四大遊戲模式全景解析](#二-四大遊戲模式全景解析)
+  - [三、 v0.9.8 最新版本突破與修復亮點](#三-v098-最新版本突破與修復亮點)
+- [伍、 專案甘特圖與敏捷開發里程碑 (人機協同架構)](#伍-專案甘特圖與敏捷開發里程碑-人機協同架構)
+  - [一、 1~9 週開發里程碑與人機協作 (Human-AI Agent Co-pilot) 架構](#一-19-週開發里程碑與人機協作-human-ai-agent-co-pilot-架構)
+  - [二、 開發角色分工權責矩陣](#二-開發角色分工權責矩陣)
+- [陸、 專案成果、創新亮點與遭遇挑戰解決](#陸-專案成果創新亮點與遭遇挑戰解決)
+  - [一、 專案整體成果展示](#一-專案整體成果展示)
+  - [二、 核心技術創新亮點](#二-核心技術創新亮點)
+  - [三、 開發痛點、除錯歷程與解決對策](#三-開發痛點除錯歷程與解決對策)
+- [柒、 參考資料與開源資源](#柒-參考資料與開源資源)
+
+---
+
+## 壹、 專案主題發想與核心願景
+
+### 一、 專案研發背景與動機
+在物聯網（IoT）與智慧家庭普及的今日，多數微型感測器僅被單純用於數據回傳或定點監控，使用情境過於單一，當使用者處於休閒或工作狀態時，昂貴的硬體設備往往處於低利用率的閒置狀態。另一方面，市售商業體感遊戲設備（如 VR 手把、方向盤、動態捕捉儀）動輒數千至數萬元，且通訊協議封閉，一般學生或獨立創作者難以客製化開發。
+
+為打破硬體壁壘，本專案由林安均、卓立凱團隊發起，打造**《多功能智慧安全監測與虛實互動體感系統》**。透過 Arduino UNO 開發板，串接超音波、三軸加速度計、溫濕度感測器、雙軸搖桿與 OLED 螢幕，建構具備「環境哨兵」與「體感控制器」雙重靈魂的創新型智慧互動物聯網系統。
+
+### 二、 核心雙模價值定位：平時為安全哨兵，戰時為體感手把
+本系統最大的創新亮點在於**「一套感測硬體，賦予雙重生命」**：
+1. **常態模式：桌上型微型智慧安全與環境監測站（Security Sentry Mode）**
+   - 放置於書桌或玄關，HC-SR04 超音波持續掃描前方警戒距離，防範背後人員突襲；ADXL345 偵測地震微震與防偷竊搬動；DHT11 掌握室內溫濕度，透過 0.96 吋 OLED 螢幕即時可視化輪播。
+2. **遊戲模式：跨平台 3D 體感極速跑酷控制器（Kinetic Controller Mode）**
+   - 當使用者啟動電腦端的 Unity 6 遊戲《極速躍動 3D》（Rolling Leap 3D）時，透過 Serial 序列埠以 20Hz 採樣率將實體數據打包串流：
+     - **超音波推進跳躍**：使用者手持裝置向前猛然一推，距離瞬間驟減即判定為「強力躍動推進」！
+     - **三軸重心傾角操控**：手持控制板左右傾斜操控賽道走位，前推衝刺、後拉煞車，模擬重力平衡球。
+     - **類比搖桿 360° 環繞視野**：以右拇指撥動搖桿，無死角旋轉鏡頭仰視 500 米摩天天梯！
+
+### 三、 實際應用場景
+- **個人工作站 / 遊戲電競桌**：平時在桌面上充當賽博龐克風格的溫濕度時鐘與防背後突襲雷達；工作疲勞時一鍵切入 Unity 跑酷挑戰，享受實體體感紓壓。
+- **居家玄關 / 臥房門口**：作為人員進出警示哨兵，亦可當作智慧門禁與環境狀態儀表。
+- **創客與互動技術教學展演**：展示如何以極低成本的 Arduino 感測器，經由數學濾波與通訊協定，打造手感媲美商用控制器的 Unity 虛實整合案例。
+
+---
+
+## 貳、 系統硬體清單與成本規格分析
+
+### 一、 硬體元件規格清單
+團隊在硬體選型上秉持「低成本、高可靠、易取得」的工程理念，並透過創客社群、實驗室既有資源（學長傳承物料）進行整合，成本結構極其經濟實惠：
+
+| 編號 | 元件名稱 | 型號/規格 | 主要功能描述 | 訊號介面 | 取得方式/市價 (NTD) |
+| :---: | :--- | :--- | :--- | :---: | :---: |
+| 1 | 微控制器主板 | **Arduino UNO R3** (ATmega328P) | 系統中樞，負責訊號採集、演算法濾波與序列埠串流 | USB / UART | 實驗室資源 (估 $250) |
+| 2 | 三軸加速度感測計 | **ADXL345** (±2g/±4g/±8g/±16g) | 偵測 X/Y/Z 傾斜角度、重力加速度與防搬動震動 | I2C (SDA/SCL) | 實驗室資源 (估 $80) |
+| 3 | 超音波測距模組 | **HC-SR04** (2cm ~ 400cm, ±3mm) | 前方警戒測距、前推手勢跳躍推進辨識 | 數位 GPIO (Trig/Echo) | 實驗室資源 (估 $45) |
+| 4 | 溫濕度感測器 | **DHT11** (20-90% RH, 0-50°C) | 環境溫濕度量測、異常高溫/高濕警示 | 單線數位協定 (Single-Bus) | 實驗室資源 (估 $35) |
+| 5 | 雙軸類比搖桿 | **PS2 Joystick Module** (KY-023) | 360 度視角環繞 (Yaw/Pitch) 與選單操作 | 雙類比 (VRX/VRY) + 數位 (SW) | 實驗室資源 (估 $30) |
+| 6 | 顯示螢幕模組 | **0.96 吋 OLED 螢幕** (128x64, SSD1306)| 本地端多頁面數據儀表顯示、警報視覺呈現 | I2C (0x3C) | 實驗室資源 (估 $90) |
+| 7 | 機構與連接組件 | 雙麵包板、洞洞板、降壓模組、杜邦線 | 電路訊號跳接、電源穩壓、結構固定 | 物理跳線 | 自購杜邦線 $20，其餘既有資源 |
+| **合計** | **全系統硬體物料清單 (BOM)** | **完整雙模互動硬體套件** | **全功能智慧哨兵 + 體感控制器** | **多協定整合** | **實體自費僅 NT$ 20 元 (總料件價值約 NT$ 550)** |
+
+### 二、 實體電路接線與腳位配置
+所有感測模組均整合於同一 Arduino 核心板上，腳位配置極具工程規範性，杜絕訊號衝突：
+
+```text
+       ┌────────────────────────────────────────────────────────┐
+       │                   Arduino UNO R3 控制板                 │
+       │                                                        │
+       │ [5V/3.3V/GND] ─── 供電匯流排 (VCC / GND)               │
+       │                                                        │
+       │ [A4 - SDA] ────── ADXL345 (I2C) &amp; 0.96&quot; OLED (0x3C)   │
+       │ [A5 - SCL] ────── ADXL345 (I2C) &amp; 0.96&quot; OLED (0x3C)   │
+       │                                                        │
+       │ [A0 - VRX] ────── 雙軸搖桿 X 軸 (水平視角 Yaw)         │
+       │ [A1 - VRY] ────── 雙軸搖桿 Y 軸 (俯仰視角 Pitch)       │
+       │ [D2 - SW]  ────── 雙軸搖桿按鈕 (INPUT_PULLUP 觸發)     │
+       │                                                        │
+       │ [D9 - TRIG] ───── HC-SR04 超音波發射端                │
+       │ [D10 - ECHO] ──── HC-SR04 超音波接收端                │
+       │                                                        │
+       │ [D4 - DATA] ───── DHT11 溫濕度單匯流排                │
+       │                                                        │
+       │ [USB / COM] ───── 傳送序列埠數據至電腦 Unity 端 (9600)│
+       └────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 參、 系統架構與虛實通訊設計
+
+### 一、 系統總體架構方塊圖
+本系統採「分層解耦、事件驅動」之物聯網架構，區分為輸入層、核心運算層、輸出介面層與虛擬遊戲互動層：
+
+```mermaid
+flowchart TD
+    subgraph 輸入層_Sensors
+        S1[&quot;HC-SR04 超音波&lt;br&gt;(前方測距 / 手勢推進)&quot;]
+        S2[&quot;ADXL345 三軸加速度計&lt;br&gt;(傾角 / 晃動防搬)&quot;]
+        S3[&quot;DHT11 溫濕度&lt;br&gt;(環境數值採樣)&quot;]
+        S4[&quot;雙軸搖桿 + 按鈕&lt;br&gt;(視角環繞 / 確認)&quot;]
+    end
+
+    subgraph 運算核心_MCU
+        MCU[&quot;Arduino UNO (ATmega328P)&lt;br&gt;• 非阻塞式定時輪詢 (20Hz)&lt;br&gt;• 訊號低通平滑濾波&lt;br&gt;• 手勢前推特徵演算法&lt;br&gt;• 序列化字串打包&quot;]
+    end
+
+    subgraph 本地輸出_LocalOutput
+        OLED[&quot;0.96吋 OLED (SSD1306)&lt;br&gt;Page 1: 儀表總覽&lt;br&gt;Page 2: 警戒雷達&lt;br&gt;Page 3: 震動監測&quot;]
+    end
+
+    subgraph 虛實通訊_Bridge
+        UART[&quot;Serial UART (9600 bps)&lt;br&gt;格式: D:xx|AX:xx|AY:xx|AZ:xx|JX:xx|JY:xx|B:x&quot;]
+    end
+
+    subgraph 虛實整合端_UnityGame
+        UNITY[&quot;Unity 6 遊戲引擎 (Rolling Leap 3D)&lt;br&gt;• ArduinoReceiver 多執行緒非阻塞接收&lt;br&gt;• 傾角重力小球運動學模型&lt;br&gt;• 360度自由環繞軌道相機&lt;br&gt;• 500米 Only Up 通天天梯&lt;br&gt;• v0.9.8 動態微風擾動與體感互斥系統&quot;]
+    end
+
+    S1 --&gt;|GPIO| MCU
+    S2 --&gt;|I2C 匯流排| MCU
+    S3 --&gt;|單匯流排| MCU
+    S4 --&gt;|類比/數位| MCU
+
+    MCU --&gt;|I2C 繪圖| OLED
+    MCU --&gt;|USB 虛擬序列埠| UART
+    UART --&gt;|封包解析與安全防禦| UNITY
+```
+
+### 二、 序列埠串流通訊協定 (Serial Stream Protocol)
+為確保數據在高頻傳輸時不丟包、不造成 Unity 主渲染執行緒卡頓，團隊制定了精簡而高效的單向 ASCII 序列埠協定：
+- **傳輸速率**：`9600 Baud Rate`（每秒約 960 字元，佔用極低單晶片資源）。
+- **更新頻率**：`20 FPS`（週期 `50ms`，兼顧反應即時性與感測器轉換時間）。
+- **封包結構**：
+  $$\text{D:&lt;float&gt;|AX:&lt;float&gt;|AY:&lt;float&gt;|AZ:&lt;float&gt;|JX:&lt;int&gt;|JY:&lt;int&gt;|B:&lt;0/1&gt;}\backslash\text{n}$$
+- **欄位定義**：
+  - `D`：超音波量測距離（單位：$\text{cm}$，範圍 $2.0 \sim 400.0$）。
+  - `AX, AY, AZ`：三軸加速度向量分量（單位：$\text{m/s}^2$ 或正規化 $\text{g}$ 值）。
+  - `JX, JY`：雙軸搖桿類比電壓值（$0 \sim 1023$，中心靜止值約 $512$）。
+  - `B`：實體搖桿按鍵狀態（$0$ 為放開，$1$ 為按下）。
+- **防禦性容錯機制**：Unity 端 `ArduinoReceiver.cs` 採用獨立非阻塞執行緒進行緩衝區讀取，遇封包殘缺或校驗失敗時自動捨棄當前幀，並保留前一幀穩定姿態，絕不拋出未處理例外導致遊戲崩潰。
+
+### 三、 感測器訊號處理與核心演算法
+#### 1. 超音波推進跳躍辨識演算法 (Push-Gesture Jump Detection)
+傳統體感跳躍多半依賴按鍵，失去真實體感樂趣。本專案研發「微分距離位移率特徵辨識」：
+- 設定距離時間窗 $\Delta t = 100\text{ms}$，計算手掌或機體朝螢幕前推之瞬間位移差 $\Delta D = D_{t} - D_{t-\Delta t}$。
+- 當測得 $\Delta D &lt; -15.0\text{cm}$（前推距離急劇縮短），且當前距離位於有效推進區間（$10\text{cm} \le D_t \le 45\text{cm}$）時，判定為玩家施展「猛力前推跳躍」手勢！
+- 觸發後啟動 $0.4$ 秒防重彈跳冷卻時間（Cooldown Timer），防止回手時誤觸跳躍。
+
+#### 2. 三軸傾角低通濾波與靜止阻尼強煞車 (Tilt Low-pass Filter &amp; Deadzone Braking)
+人手持握控制器必然伴隨微幅肌肉顫動與雜訊。為消除小球「帕金森式微晃」，設計兩段式訊號處理：
+- **一階指數平滑低通濾波**：
+  $$\bar{A}_t = \alpha \cdot A_t + (1 - \alpha) \cdot \bar{A}_{t-1} \quad (\alpha = 0.25)$$
+- **靜止死區與主動煞車阻尼（v0.9.8 最新升級）**：
+  當 $|\bar{A}_x| &lt; 0.08$ 且 $|\bar{A}_y| &lt; 0.08$ 時，系統判定玩家意圖「原地平穩停留」，Unity 物理層即刻注入主動角阻尼與線阻尼（$\text{Rigidbody.velocity} \times 0.75$），使小球能極致平穩停在狹窄天梯平台上，徹底解決球體自主滑落的挫折感。
+
+#### 3. 雙軸搖桿死區濾波與視角動態映射 (Joystick Deadzone &amp; Orbit Mapping)
+類比搖桿存在彈簧回中誤差（常態散佈於 $500 \sim 525$）。透過自適應死區映射公式：
+$$\text{Input}_{\text{norm}} = \text{Sign}(V - 512) \times \max\left(0, \frac{|V - 512| - \text{DeadZone}}{512 - \text{DeadZone}}\right) \quad (\text{DeadZone} = 40)$$
+確保搖桿回中時視角完全靜止無飄移，推至極限時平滑輸出全速旋轉。
+
+---
+
+## 肆、 《極速躍動 3D》虛實整合遊戲核心設計 (v0.9.8)
+
+### 一、 3D 物理小球運動學與雙模控制
+遊戲建構於 Unity 6 物理管線之上，打造極速節奏與沉浸操控：
+- **雙模無縫切換**：
+  - **鍵盤/滑鼠模式**：`W/S/A/D` 控制走位、`Space` 跳躍、滑鼠自由環繞視角，適合一般電腦玩家。
+  - **Arduino 體感模式**：三軸傾角直覺控制重力滾動、超音波手勢推進躍動、搖桿環繞視角，帶來無可取代的實體硬體反饋。
+- **相機水平朝向向量聯動 (Camera Forward/Right)**：
+  小球的運動方向並非固定世界座標，而是動態投影至相機目前的水平視野向量（$\vec{V}_{\text{forward}} = \text{Normalize}(\vec{C}_{\text{forward}} \times \vec{Up} \times \vec{Up})$）。玩家視角環繞轉向哪裡，前傾即朝向該視野衝刺，極度符合人體工學！
+
+### 二、 四大遊戲模式全景解析
+1. **10 大手作漸進特色關卡 (10 Handcrafted Levels)**：
+   - 由 LV.1「霓虹大道」一路晉升至 LV.10「終極躍動」，巧妙結合高速衝刺加速帶、高空大拋物線跳躍墊、移動尖刺與極限鋼索窄道。
+2. **⚡ 無盡極限跑酷模式 (Endless Mode)**：
+   - 採用程序化無縫動態區塊生成算法，隨存活里程提高滾動速度與障礙複雜度，挑戰全球最高分排行榜。
+3. **🛠️ 自訂場地編輯器 (Track Builder Mode)**：
+   - 提供上帝俯視視角的即時網格編輯器，玩家可隨意拖放賽道板塊、彈跳墊、八面體水晶與障礙，支援 JSON 本地存檔與一鍵即時試玩驗證！
+4. **🏰 500 米極限攀爬：通天天梯模式 (Sky Tower Mode - Only Up 風格)**：
+   - 考驗玩家極致專注力的 500 米垂直通天天塔，全塔精雕細琢六大分區：
+     - `0m ~ 80m`：【地表基座與入門階梯】寬廣平台基礎練習。
+     - `80m ~ 160m`：【機械起重與鋼骨鷹架】考驗極限微操的狹窄工字鋼道。
+     - `160m ~ 260m`：【微風浮島與動態跳躍】週期性橫移與垂直升降浮動島嶼。
+     - `260m ~ 360m`：【空中花園與曲折圓柱】弧形階梯與旋轉機關。
+     - `360m ~ 440m`：【暴風雷雲與消失板】視線受限的高空盲跳考驗。
+     - `440m ~ 500m`：【天頂星環與通天終點星門】登頂踏入金色星門解鎖最終勝利榮耀！
+
+### 三、 v0.9.8 最新版本突破與修復亮點
+本專案於 2026 年 11 月 1 日正式推出 **v0.9.8 重大更新版**，全面攻克前期測試的所有體驗瓶頸：
+1. 🌬️ **關卡動態微風擾動與體感互斥系統 (Dynamic Crosswind &amp; Mutex)**：
+   - 1~10 關左右微風擾動強度依難度線性遞增（Level 1 基準值 `2.4f` 至 Level 10 達到 `4.38f`），為跑酷注入動態變數。
+   - **體感安全互斥**：純鍵盤模式啟用虛擬微風；**當偵測到連接 Arduino 陀螺儀時，系統自動關閉虛擬微風**，確保實體重力傾角回饋 100% 純粹直覺。
+2. 🏰 **通天天梯彈跳墊烈焰金橙視覺重構 (Blazing Gold-Orange JumpPad)**：
+   - 徹底捨棄原先容易在高空藍天背景中「保護色隱形」的淡青外觀，重構為：高飽和度亮金橙板面、黑曜石立體深色底座、中央 45° 旋轉發光白金標誌，並賦予動態呼吸自發光脈衝，攀爬視野極度醒目！
+   - 修復三個連排彈跳墊引發異常超高累加跳躍的物理缺陷。
+3. 📐 **垂直空間重疊消除與寶石動態刷新防線**：
+   - 重構生成間距演算法，徹底根絕上下板塊高度重疊卡球問題。
+   - 動態統計活躍寶石與累計收集數，徹底修復天梯結算左上角寶石數量倒掛（如 8/7）之邏輯 Bug。
+4. 🖱️ **游標全螢幕鎖定與沉浸式無界視角**：
+   - 進入關卡自動鎖定並隱藏游標（`CursorLockMode.Locked`），徹底根絕多螢幕滑鼠滑出視窗外失焦的痛點；按下 `ESC` 或死亡結算時自動釋放游標。
+
+---
+
+## 伍、 專案甘特圖與敏捷開發里程碑 (人機協同架構)
+
+### 一、 1~9 週開發里程碑與人機協作 (Human-AI Agent Co-pilot) 架構
+本專案採用現代資訊工業推崇之**「人機協同敏捷研發模式 (Human-AI Agent Co-pilot Architecture)」**。由學生團隊林安均、卓立凱擔任產品經理與硬體工程師，主導系統架構、硬體焊接與手感驗證；並導入由雲端 **Gemini 3.8 Flash** 作為主架構師指揮官、本地端 **Qwen 27B** 作為程式代碼起草專家組成的多智能體系統（Agent Swarm），高效完成複雜物理運動學推導、多任務分批隊列與 Git 版本控制：
+
+```mermaid
+gantt
+    title 多功能智慧安全監測與虛實互動體感系統 (1~9週研發甘特圖)
+    dateFormat  YYYY-MM-DD
+    section 階段一：需求與架構
+    主題發想、感測器選型與企劃撰寫           :done, w1, 2026-09-01, 14d
+    硬體採購、BOM表整理與電路規劃             :done, w2, 2026-09-08, 14d
+    section 階段二：韌體與通訊
+    Arduino 感測器採集與 OLED 儀表實作       :done, w3, 2026-09-22, 14d
+    Serial 通訊協定制定與防丟包機制          :done, w4, 2026-09-29, 14d
+    section 階段三：Unity 核心開發
+    Unity 物理小球運動學與序列埠接收驅動     :done, w5, 2026-10-06, 14d
+    10 大漸進關卡與無盡跑酷模式完成          :done, w6, 2026-10-13, 14d
+    section 階段四：天梯模式與調校
+    500米通天天梯 (Only Up) 六大分區與相機實作:done, w7, 2026-10-20, 14d
+    實體手勢推進與傾角濾波演算法優化         :done, w8, 2026-10-27, 7d
+    section 階段五：v0.9.8發布與報告
+    v0.9.8 微風系統、金橙彈跳墊與專案正式結案:done, w9, 2026-10-31, 7d
+```
+
+### 二、 開發角色分工權責矩陣
+
+| 階段 / 週次 | 核心研發任務與工程產出 | 主要負責人 | 人機協同 (AI Agent) 深度賦能說明 |
+| :---: | :--- | :---: | :--- |
+| **第 1~2 週** | 專案主題確認、智慧監測與虛實遊戲雙模架構定案、BOM 清單擬定 | 林安均、卓立凱 | 協同 Gemini 進行雙模互動物聯網架構可行性評估 |
+| **第 3~4 週** | Arduino 韌體編寫、OLED 三分頁顯示、ADXL345 與超音波多工讀取 | 林安均、卓立凱 | 協同 Qwen 27B 起草高效非阻塞 `millis()` 輪詢狀態機 |
+| **第 5 週** | 突破單純安全監測，全面啟動 Unity 3D 物理遊戲開發，建立 Serial 接收管線 | 林安均、卓立凱 | 人機敏捷重構：由 Agent 輔助建立多執行緒安全佇列與小球物理運動模型 |
+| **第 6 週** | 完成 10 大特色關卡、無盡動態路塊生成器、自訂場地編輯器 (Track Builder) | 林安均、卓立凱 | Agent 團隊並行生成關卡網格演算法與皮膚商店數據持久化框架 |
+| **第 7 週** | 研發 500 米極限通天天梯模式、360° 軌道環繞相機、游標鎖定沉浸體驗 | 林安均、卓立凱 | 協同推導相機水平朝向向量聯動公式，修復視角穿模與邊界反轉 |
+| **第 8 週** | 硬體聯調、超音波手勢推進躍動辨識演算法、傾角低通濾波手感調校 | 林安均、卓立凱 | 實體感測器真實接線測試，軟體層注入死區過濾與抗抖動公式 |
+| **第 9 週** | **v0.9.8 終極重構**：動態微風系統、烈焰金橙彈跳墊視覺、GitHub Release 發布 | 林安均、卓立凱 | 執行 Qwen Worker 雙模型管線，全自動化打包 Windows 發行檔並完成期末報告 |
+
+---
+
+## 陸、 專案成果、創新亮點與遭遇挑戰解決
+
+### 一、 專案整體成果展示
+1. **實體硬體終端**：完成模組化 Arduino 體感控制器，具備 OLED 狀態顯示、超音波測距前推跳躍、三軸傾角姿態感測與雙軸視角旋轉搖桿。
+2. **軟體遊戲成品**：完成《極速躍動 3D》（Rolling Leap 3D）v0.9.8，內建 10 大手作關卡、無盡跑酷、賽道編輯器與 500 米通天天梯。
+3. **開源專案與免安裝發布**：所有原始碼均已託管於 GitHub，並附帶已編譯通過、免安裝解壓即玩的 Windows 執行壓縮包（`54.22 MB`）。
+
+### 二、 核心技術創新亮點
+- **雙模式智慧切換（Dual-Mode Versatility）**：徹底顛覆物聯網感測器只作數據看板的缺點，平常守護居家安全，休閒時秒變極速體感搖桿。
+- **超音波推進手勢演算法（Kinetic Push Algorithm）**：捨棄機械按鈕，以真實雙手往前猛推的空間位移率觸發跳躍，創造極高遊玩沉浸感。
+- **智慧虛實互斥保護（Kinetic-Wind Mutex）**：一般鍵盤玩家享有動態微風挑戰，體感玩家則由系統自動卸載虛擬風阻，確保實體重力感測反饋純粹穩定。
+- **專業級游標與相機鎖定體系**：徹底根絕 Unity 獨立視窗遊戲多螢幕滑鼠溢出失焦的宿疾，具備 360 度無上限環繞旋轉與死區平滑過濾。
+
+### 三、 開發痛點、除錯歷程與解決對策
+
+| 遭遇技術挑戰 / 缺陷 | 根本原因剖析 (Root Cause) | 最終工程解決方案 |
+| :--- | :--- | :--- |
+| **1. 體感手抖導致小球無法停在原地** | 人手微幅震顫使 ADXL345 輸出細小加速度，物理剛體持續受力滑落。 | 導入動態靜態死區與主動煞車阻尼，水平狀態強制注入速度衰減（$\times 0.75$）。 |
+| **2. 高空背景下彈跳墊極難看清** | 原淡青色彈跳墊與高空藍天白雲高度同色，玩家難以及時預判落點。 | 視覺全面重構為「烈焰金橙板面 + 黑曜石底座 + 白金核心 + 呼吸光脈衝」。 |
+| **3. 三個連排彈跳墊引發異常超高彈跳** | 剛體連續觸發 `OnTriggerEnter`，衝量多次瞬時疊加致使小球飛出天際。 | 加入 `0.35s` 彈跳衝量冷卻計時器，限制連續觸發時的垂直速度上限。 |
+| **4. 天梯上下板塊重疊卡球** | 隨機階梯生成算法在垂直高度遞增與水平迴轉時未考慮物體邊界盒 (Bounding Box)。 | 重構生成間距演算法，強制限制相鄰板塊之水平與垂直安全間距 $\ge 1.8\text{m}$。 |
+| **5. 寶石計數倒掛 (顯示 8/7)** | 關卡重置與動態生成時未及時重新統計場景活躍寶石，導致基數不合。 | 開發 `RefreshTotalGems()` 動態統計活躍物件 + 收集數，徹底根絕倒掛。 |
+
+---
+
+## 柒、 參考資料與開源資源
+
+1. **專案開源 GitHub 儲存庫**：  
+   `https://github.com/agm129134-bit/arduinoGame.git`
+2. **官方最新 Release v0.9.8 遊戲發行檔**：  
+   `https://github.com/agm129134-bit/arduinoGame/releases/tag/v0.9.8`
+3. **相關技術文獻與官方參考規範**：
+   - Unity Technologies, *Unity 6 User Manual: Physics &amp; Rigidbody Movement*, 2024.
+   - Analog Devices, *ADXL345: 3-Axis, ±2g/±4g/±8g/±16g Digital Accelerometer Data Sheet*, Rev. E.
+   - SparkFun Electronics, *HC-SR04 Ultrasonic Sensor User Guide &amp; Timing Diagrams*.
+   - Arduino LLC, *Arduino Serial Communication &amp; Non-blocking Timing with millis()*.
+   - Only Up! (SCKR Games), *Level Architecture &amp; Vertical Progression Game Design*.
+
+---
+*(全書完 / 專案成果報告書審查版)*
+</pre>
+</div>
+</body>
+</html>
