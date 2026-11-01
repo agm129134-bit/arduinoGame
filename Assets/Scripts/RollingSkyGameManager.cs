@@ -147,6 +147,12 @@ public class RollingSkyGameManager : MonoBehaviour
         // 綁定所有面板按鈕事件
         BindAllButtonsRuntime();
 
+        // 無盡模式下隱藏左上角寶石文字（徹底消除孤立數字 0 裁切問題）
+        if (gemText != null && isEndlessMode)
+        {
+            gemText.gameObject.SetActive(false);
+        }
+
         UpdateGemUI();
 
         // 鎖定並隱藏滑鼠游標，防止游標滑出視窗並提升遊玩沉浸感
@@ -1328,7 +1334,18 @@ public class RollingSkyGameManager : MonoBehaviour
                 PlayerPrefs.Save();
             }
 
-            if (progressText != null) progressText.text = $"⚡ 得分: {score}  |  🏆 最佳: {bestScore}";
+            if (progressText != null)
+            {
+                // 徹底修復分數超過一千分被切掉問題：放寬寬度至 850 並啟用 Overflow
+                progressText.horizontalOverflow = HorizontalWrapMode.Overflow;
+                progressText.verticalOverflow = VerticalWrapMode.Overflow;
+                RectTransform prt = progressText.GetComponent<RectTransform>();
+                if (prt != null && prt.sizeDelta.x < 750f)
+                {
+                    prt.sizeDelta = new Vector2(850f, 60f);
+                }
+                progressText.text = $"⚡ 得分: {score}  |  🏆 最佳: {bestScore}";
+            }
             if (progressBar != null) progressBar.value = Mathf.PingPong(currentDist / 80f, 1.0f);
         }
         else
@@ -1365,13 +1382,16 @@ public class RollingSkyGameManager : MonoBehaviour
             return;
         }
 
+        RollingSkyBallController ballCtrl = ball != null ? ball.GetComponent<RollingSkyBallController>() : null;
+        string swayInfo = (ballCtrl != null && ballCtrl.enableSway && !isEndlessMode) ? $" | <color=yellow>平衡風力: {ballCtrl.CurrentSwayForce:+0.0;-0.0;0.0}</color>" : "";
+
         if (arduino != null && arduino.distance > 0)
         {
-            hardwareStatusText.text = $"超音波測距: <color=yellow>{arduino.distance:F1} cm</color> (揮手跳躍) | 傾斜感應: <color=cyan>{arduino.acceleration.x:F2}</color> | <color=white>[ESC: 暫停選單]</color>";
+            hardwareStatusText.text = $"超音波測距: <color=yellow>{arduino.distance:F1} cm</color> (揮手跳躍) | 傾斜感應: <color=cyan>{arduino.acceleration.x:F2}</color>{swayInfo} | <color=white>[ESC: 暫停選單]</color>";
         }
         else
         {
-            hardwareStatusText.text = "鍵盤操作模式: [A/D: 左右移] | [Space: 跳躍] | [R: 重試] | <color=cyan>[ESC: 暫停 / 回到選單]</color>";
+            hardwareStatusText.text = $"鍵盤操作模式: [A/D: 左右移] | [Space: 跳躍] | [R: 重試]{swayInfo} | <color=cyan>[ESC: 暫停 / 回到選單]</color>";
         }
     }
 
@@ -1387,10 +1407,23 @@ public class RollingSkyGameManager : MonoBehaviour
         {
             if (isEndlessMode)
             {
-                gemText.text = $"💎 已收集: {collectedGems}";
+                // 無盡模式徹底隱藏左上角孤立文字，避免裁切露出的殘留數字 "0"
+                gemText.gameObject.SetActive(false);
             }
             else
             {
+                gemText.gameObject.SetActive(true);
+                RectTransform grt = gemText.GetComponent<RectTransform>();
+                if (grt != null)
+                {
+                    grt.anchorMin = new Vector2(0, 1);
+                    grt.anchorMax = new Vector2(0, 1);
+                    grt.pivot = new Vector2(0, 1);
+                    grt.anchoredPosition = new Vector2(30, -30);
+                    grt.sizeDelta = new Vector2(300, 45);
+                }
+                gemText.horizontalOverflow = HorizontalWrapMode.Overflow;
+                gemText.verticalOverflow = VerticalWrapMode.Overflow;
                 gemText.text = $"💎 {collectedGems} / {totalGemsInLevel}";
             }
         }

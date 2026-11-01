@@ -14,9 +14,20 @@ public class RollingSkyBallController : MonoBehaviour
     [Header("Hardware / Tilt Settings")]
     public ArduinoReceiver arduino;
     [Tooltip("MPU-6050 加速度計靈敏度")]
-    public float tiltSensitivity = 1.8f;
+    public float tiltSensitivity = 2.6f;
     [Tooltip("手部微抖死區")]
-    public float tiltDeadzone = 0.08f;
+    public float tiltDeadzone = 0.04f;
+
+    [Header("Balance Drift / Sway Settings (一般關卡自然左右偏移難度)")]
+    public bool enableSway = true;
+    public float swayIntensity = 1.2f;
+    public float swayFrequency = 2.4f;
+    private float currentSwayForce = 0f;
+    public float CurrentSwayForce => currentSwayForce;
+
+    [Header("Jump Pad Cooldown")]
+    private float lastJumpPadLaunchTime = -999f;
+    public float LastJumpPadLaunchTime => lastJumpPadLaunchTime;
 
     [Header("Ground & Jump Polish")]
     public LayerMask groundLayer = ~0;
@@ -93,8 +104,10 @@ public class RollingSkyBallController : MonoBehaviour
         customKeyRight = (KeyCode)PlayerPrefs.GetInt("Key_Right", (int)KeyCode.D);
         customKeyJump = (KeyCode)PlayerPrefs.GetInt("Key_Jump", (int)KeyCode.Space);
         horizontalSpeed = PlayerPrefs.GetFloat("Keyboard_Speed", 9.0f);
-        tiltSensitivity = PlayerPrefs.GetFloat("Tilt_Sensitivity", 1.8f);
-        tiltDeadzone = PlayerPrefs.GetFloat("Tilt_Deadzone", 0.08f);
+        tiltSensitivity = PlayerPrefs.GetFloat("Tilt_Sensitivity", 2.6f);
+        tiltDeadzone = PlayerPrefs.GetFloat("Tilt_Deadzone", 0.04f);
+        enableSway = (PlayerPrefs.GetInt("Sway_Enabled", 1) == 1);
+        swayIntensity = PlayerPrefs.GetFloat("Sway_Intensity", 1.2f);
     }
 
     /// <summary>
@@ -192,11 +205,11 @@ public class RollingSkyBallController : MonoBehaviour
             float jumpThresh = PlayerPrefs.GetFloat("Jump_Distance", 20.0f);
             float delta = dist - lastUltrasonicDist;
 
-            // 推進手勢檢測：距離快速縮小 (delta < -8) 或達到門檻 (dist < jumpThresh)
-            if ((delta < -8.0f || (dist <= jumpThresh && lastUltrasonicDist > jumpThresh + 1.5f)) && ultrasonicJumpCooldown <= 0f)
+            // 推進手勢檢測：距離快速縮小 (delta < -4.5) 或達到門檻 (dist < jumpThresh)，響應大幅提速
+            if ((delta < -4.5f || (dist <= jumpThresh && lastUltrasonicDist > jumpThresh + 1.2f)) && ultrasonicJumpCooldown <= 0f)
             {
                 jumpBufferTimer = jumpBufferTime;
-                ultrasonicJumpCooldown = 0.4f;
+                ultrasonicJumpCooldown = 0.35f;
             }
             lastUltrasonicDist = Mathf.Lerp(lastUltrasonicDist, dist, Time.deltaTime * 10f);
         }
@@ -268,6 +281,18 @@ public class RollingSkyBallController : MonoBehaviour
             // 常規跑酷：計算水平速度與固定向前速度
             float targetVx = currentHorizontalInput * horizontalSpeed;
 
+            // 【一般關卡左右平衡擾動】：非無盡且非天梯模式時，小球自然產生正弦側風微漂移
+            // 玩家必須適度微調左右方向以維持航向平衡，增加操控樂趣與挑戰難度！
+            if (enableSway && !isEndlessMode)
+            {
+                currentSwayForce = Mathf.Sin(Time.time * swayFrequency + transform.position.z * 0.14f) * swayIntensity;
+                targetVx += currentSwayForce;
+            }
+            else
+            {
+                currentSwayForce = 0f;
+            }
+
             Vector3 vel = rb.linearVelocity;
             vel.x = targetVx;
             vel.z = forwardSpeed;
@@ -289,18 +314,24 @@ public class RollingSkyBallController : MonoBehaviour
         float pitchInput = 0f;
         if (arduino != null)
         {
-            // MPU-6050 X軸加速度代表左右傾角
+            // MPU-6050 X軸加速度代表左右傾角 (採用動態正規化與非線性微調曲線，大幅消除遲鈍感)
             float rawTilt = arduino.acceleration.x;
             if (Mathf.Abs(rawTilt) > tiltDeadzone)
             {
-                tiltInput = Mathf.Clamp(rawTilt * tiltSensitivity, -1f, 1f);
+                float sign = Mathf.Sign(rawTilt);
+                float normTilt = Mathf.Clamp01((Mathf.Abs(rawTilt) - tiltDeadzone) / (1.0f - tiltDeadzone));
+                tiltInput = sign * Mathf.Pow(normTilt, 1.15f) * tiltSensitivity;
+                tiltInput = Mathf.Clamp(tiltInput, -1f, 1f);
             }
 
             // MPU-6050 Y軸加速度代表前後傾角 (前傾往前跑，後傾往後跑)
             float rawPitch = arduino.acceleration.y;
             if (Mathf.Abs(rawPitch) > tiltDeadzone)
             {
-                pitchInput = Mathf.Clamp(rawPitch * tiltSensitivity, -1f, 1f);
+                float sign = Mathf.Sign(rawPitch);
+                float normPitch = Mathf.Clamp01((Mathf.Abs(rawPitch) - tiltDeadzone) / (1.0f - tiltDeadzone));
+                pitchInput = sign * Mathf.Pow(normPitch, 1.15f) * tiltSensitivity;
+                pitchInput = Mathf.Clamp(pitchInput, -1f, 1f);
             }
         }
 
@@ -366,6 +397,8 @@ public class RollingSkyBallController : MonoBehaviour
     public void Launch(float launchForce, float forwardBoost)
     {
         if (isDead) return;
+        if (Time.time - lastJumpPadLaunchTime < 0.45f) return; // 全域彈跳冷卻防止三連彈跳墊連續引爆
+        lastJumpPadLaunchTime = Time.time;
 
         Vector3 vel = rb.linearVelocity;
         vel.y = launchForce;

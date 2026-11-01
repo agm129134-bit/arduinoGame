@@ -108,23 +108,27 @@ public class RollingSkyCamera : MonoBehaviour
                 }
             }
 
-            // 2. Arduino 雙軸實體搖桿視角控制 (中位值約 500)
+            // 2. Arduino 雙軸實體搖桿視角控制 (中位值約 500，全面重構靈敏度與平滑非線性曲線)
             if (arduino == null) arduino = FindAnyObjectByType<ArduinoReceiver>();
             if (arduino != null)
             {
                 float joyX = (arduino.joystick.x - 500f) / 500f;
                 float joyY = (arduino.joystick.y - 500f) / 500f;
-                const float joyDeadzone = 0.15f;
+                const float joyDeadzone = 0.08f; // 縮小死區，提升微調靈敏度
 
                 if (Mathf.Abs(joyX) > joyDeadzone)
                 {
                     float sign = Mathf.Sign(joyX);
-                    yaw += sign * (Mathf.Abs(joyX) - joyDeadzone) * cameraSensitivity * 90f * Time.deltaTime;
+                    float normX = (Mathf.Abs(joyX) - joyDeadzone) / (1.0f - joyDeadzone);
+                    // Yaw 水平環繞旋轉角速度自 90f 顯著提升至 220f，加入非線性加速曲線
+                    yaw += sign * Mathf.Pow(normX, 1.15f) * cameraSensitivity * 220f * Time.deltaTime;
                 }
                 if (Mathf.Abs(joyY) > joyDeadzone)
                 {
                     float sign = Mathf.Sign(joyY);
-                    pitch -= sign * (Mathf.Abs(joyY) - joyDeadzone) * cameraSensitivity * 70f * Time.deltaTime;
+                    float normY = (Mathf.Abs(joyY) - joyDeadzone) / (1.0f - joyDeadzone);
+                    // Pitch 垂直俯仰角速度自 70f 提升至 160f
+                    pitch -= sign * Mathf.Pow(normY, 1.15f) * cameraSensitivity * 160f * Time.deltaTime;
                 }
             }
 
