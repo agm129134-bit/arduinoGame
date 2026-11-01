@@ -585,7 +585,7 @@ public class RollingSkyMenuManager : MonoBehaviour
                 int gems = PlayerPrefs.GetInt("TotalGems", 0);
                 int highScore = PlayerPrefs.GetInt("Endless_HighScore", 0);
                 int towerHeight = PlayerPrefs.GetInt("SkyTower_BestHeight", 0);
-                txt.text = $"💎 水晶: <color=cyan>{gems}</color>   |   🏆 無盡最高: <color=yellow>{highScore}</color> 分   |   🗼 天梯最高: <color=lime>{towerHeight}m</color>";
+                txt.text = $"💎 水晶: <color=cyan>{gems}</color>   |   🏆 無盡最高: <color=yellow>{highScore}</color> 分   |   🗼 天梯最高: <color=lime>{towerHeight}m</color>   |   <color=#AAAAAA>v0.9.8</color>";
             }
         }
     }
