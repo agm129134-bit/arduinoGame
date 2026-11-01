@@ -3,21 +3,24 @@ using UnityEngine;
 public class JumpPad : MonoBehaviour
 {
     [Header("Jump Pad Settings")]
-    public float launchForce = 16.0f;
-    public float forwardBoost = 2.0f;
+    public float launchForce = 13.5f;
+    public float forwardBoost = 1.4f;
     public Color activeColor = new Color(0f, 1f, 0.9f);
 
     private float lastLaunchTime = -999f;
 
     void Awake()
     {
-        // 修正 Collider 為適當貼地觸發器 (高 0.45m)，徹底杜絕高空掠過誤觸發
         BoxCollider bc = GetComponent<BoxCollider>();
         if (bc != null)
         {
             bc.isTrigger = true;
-            bc.size = new Vector3(1.0f, 0.45f, 1.0f);
-            bc.center = new Vector3(0, 0.22f, 0);
+            // 充分覆蓋左右邊緣並向上延伸感應範圍：
+            // X: 1.45f (實體寬度擴展至約 2.65m，邊緣觸碰 100% 觸發)
+            // Y: 10.0f (乘上 localScale.y = 0.12 後，世界高度約 1.2m，上方充足觸發空間)
+            // Z: 1.45f (前後延伸防漏踩)
+            bc.size = new Vector3(1.45f, 10.0f, 1.45f);
+            bc.center = new Vector3(0, 5.0f, 0);
         }
     }
 
@@ -41,16 +44,19 @@ public class JumpPad : MonoBehaviour
         RollingSkyBallController ball = target.GetComponent<RollingSkyBallController>() ?? target.GetComponentInParent<RollingSkyBallController>();
         if (ball == null || ball.IsDead) return;
 
-        // 【空中防誤觸哨兵】：若小球在空中向上飛昇 (Y 軸向上速度 > 1.2m/s)，絕不在半空中引爆跳台
+        // 【空中跳躍保護】：若小球已在彈跳滯空狀態中 (尚未著陸)，絕不允許二段重複觸發
+        if (ball.IsJumpPadAirborne) return;
+
+        // 【空中向上飛昇哨兵】：若小球正處於空中高速向上飛行 (Y 速度 > 1.0m/s)，不可再次引爆
         Rigidbody rb = ball.GetComponent<Rigidbody>();
-        if (rb != null && rb.linearVelocity.y > 1.2f) return;
+        if (rb != null && rb.linearVelocity.y > 1.0f) return;
 
-        // 【垂直高度防護】：小球必須接近跳台表面 (高度差 < 0.85m)，在上方高空飛過時不觸發
-        if (ball.transform.position.y > transform.position.y + 0.85f) return;
+        // 【上方感應高度門檻】：小球在跳台上方 1.4m 範圍內均可靈敏觸發 (擴大上方感應)
+        if (ball.transform.position.y > transform.position.y + 1.4f) return;
 
-        // 【全域與局部彈跳冷卻】：跳台個體冷卻 0.35 秒，小球全域跳台冷卻 0.5 秒，徹底杜絕多個彈跳墊相鄰時連續疊加超高跳躍
-        if (Time.time - ball.LastJumpPadLaunchTime < 0.5f) return;
-        if (Time.time - lastLaunchTime < 0.35f) return;
+        // 【全域與局部冷卻】：跳台獨立冷卻 0.4s，小球全域跳台冷卻 0.6s
+        if (Time.time - ball.LastJumpPadLaunchTime < 0.6f) return;
+        if (Time.time - lastLaunchTime < 0.4f) return;
 
         lastLaunchTime = Time.time;
         ball.Launch(launchForce, forwardBoost);

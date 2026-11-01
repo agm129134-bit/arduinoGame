@@ -1144,9 +1144,9 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         if (bc != null)
         {
             bc.isTrigger = true;
-            // 修正為貼地 0.45m 高度觸發器，小球在空中掠過時絕不誤觸發
-            bc.size = new Vector3(1.0f, 0.45f, 1.0f);
-            bc.center = new Vector3(0, 0.22f, 0);
+            // 充分覆蓋左右邊緣 (X/Z: 1.45f) 並向上延伸感應範圍 (Y: 10.0f * 0.12f = 1.2m)
+            bc.size = new Vector3(1.45f, 10.0f, 1.45f);
+            bc.center = new Vector3(0, 5.0f, 0);
         }
         JumpPad jp = pad.AddComponent<JumpPad>();
         if (force > 0f) jp.launchForce = force;
