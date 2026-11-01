@@ -109,7 +109,31 @@ public class RollingSkyBallController : MonoBehaviour
         tiltSensitivity = PlayerPrefs.GetFloat("Tilt_Sensitivity", 2.6f);
         tiltDeadzone = PlayerPrefs.GetFloat("Tilt_Deadzone", 0.04f);
         enableSway = (PlayerPrefs.GetInt("Sway_Enabled", 1) == 1);
-        swayIntensity = PlayerPrefs.GetFloat("Sway_Intensity", 2.4f);
+
+        int selectedLevel = PlayerPrefs.GetInt("SelectedLevel", 1);
+        bool isBuilder = (PlayerPrefs.GetInt("IsBuilderMode", 0) == 1);
+        bool isEndless = (PlayerPrefs.GetInt("IsEndlessMode", 0) == 1);
+        bool isSkyTower = (PlayerPrefs.GetInt("IsSkyTowerMode", 0) == 1);
+
+        if (isBuilder)
+        {
+            // 自訂地圖模式也加入左右偏移幅度 (標準 2.4f)
+            swayIntensity = 2.4f;
+        }
+        else if (isEndless)
+        {
+            swayIntensity = PlayerPrefs.GetFloat("Sway_Intensity", 2.6f);
+        }
+        else if (!isSkyTower)
+        {
+            // 一般關卡 1~10 關幅度越來越大，第 1 關使用現在這幅度 (2.4f)，後續逐級遞增
+            int lvl = Mathf.Clamp(selectedLevel, 1, 10);
+            swayIntensity = 2.4f + (lvl - 1) * 0.22f;
+        }
+        else
+        {
+            swayIntensity = 0f;
+        }
     }
 
     /// <summary>

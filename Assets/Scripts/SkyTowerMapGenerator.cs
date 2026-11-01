@@ -51,7 +51,7 @@ public class SkyTowerMapGenerator : MonoBehaviour
         matZone5_Cosmic = CreateMat("Mat_Zone5_Cosmic", new Color(0.10f, 0.08f, 0.24f), new Color(0.5f, 0.2f, 1.1f));
         matZone6_Apex = CreateMat("Mat_Zone6_Apex", new Color(0.35f, 0.28f, 0.08f), new Color(1.8f, 1.4f, 0.3f));
 
-        matJumpPad = CreateMat("Mat_Tower_JumpPad", new Color(0.1f, 0.8f, 0.3f), new Color(0.2f, 2.0f, 0.6f));
+        matJumpPad = CreateMat("Mat_Tower_JumpPad", new Color(1.0f, 0.52f, 0.05f), new Color(4.8f, 2.5f, 0.2f));
         matSpike = CreateMat("Mat_Tower_Spike", new Color(0.8f, 0.1f, 0.1f), new Color(2.0f, 0.2f, 0.1f));
         matMonolith = CreateMat("Mat_Tower_Monolith", new Color(1.0f, 0.9f, 0.4f), new Color(2.5f, 2.0f, 0.6f));
 
@@ -105,6 +105,11 @@ public class SkyTowerMapGenerator : MonoBehaviour
         BuildZone6_ApexShrine(towerRoot.transform);
 
         Debug.Log("[SkyTower] 500 米高塔地圖建構完成！");
+        RollingSkyGameManager gm = FindAnyObjectByType<RollingSkyGameManager>();
+        if (gm != null)
+        {
+            gm.RefreshTotalGems();
+        }
     }
 
     // ==================== 0. 起點基座與底層接地地板 ====================
@@ -416,12 +421,38 @@ public class SkyTowerMapGenerator : MonoBehaviour
 
     void CreateJumpPad(Vector3 pos, float launchForce, Transform parent)
     {
+        // 1. 深色金屬黑曜石防滑外框基座 (Rim/Base)，形成鮮明輪廓反差，絕不與青藍平臺融為一體
+        GameObject rim = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        rim.name = "SkyTower_JumpPad_Rim";
+        rim.transform.SetParent(parent);
+        rim.transform.position = pos + Vector3.up * 0.02f;
+        rim.transform.localScale = new Vector3(3.0f, 0.22f, 3.0f);
+        rim.GetComponent<MeshRenderer>().material = matGround;
+        Destroy(rim.GetComponent<Collider>());
+
+        // 2. 主體烈焰金橙高亮發光彈跳墊 (加大至 2.6x2.6m)
         GameObject pad = GameObject.CreatePrimitive(PrimitiveType.Cube);
         pad.name = "SkyTower_JumpPad";
         pad.transform.SetParent(parent);
-        pad.transform.position = pos;
-        pad.transform.localScale = new Vector3(1.8f, 0.15f, 1.8f);
+        pad.transform.position = pos + Vector3.up * 0.08f;
+        pad.transform.localScale = new Vector3(2.6f, 0.26f, 2.6f);
         pad.GetComponent<MeshRenderer>().material = matJumpPad;
+
+        // 3. 中央向上推進耀眼白金箭頭核心 (Core Beacon)
+        GameObject core = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        core.name = "JumpPad_BeaconCore";
+        core.transform.SetParent(pad.transform);
+        core.transform.localPosition = new Vector3(0, 0.55f, 0);
+        core.transform.localRotation = Quaternion.Euler(0, 45, 0);
+        core.transform.localScale = new Vector3(0.42f, 0.20f, 0.42f);
+        Material coreMat = new Material(Shader.Find("Standard"))
+        {
+            color = new Color(1.0f, 0.95f, 0.6f)
+        };
+        coreMat.SetColor("_EmissionColor", new Color(5.5f, 4.8f, 1.8f));
+        coreMat.EnableKeyword("_EMISSION");
+        core.GetComponent<MeshRenderer>().material = coreMat;
+        Destroy(core.GetComponent<Collider>());
 
         JumpPad jp = pad.AddComponent<JumpPad>();
         jp.launchForce = launchForce;

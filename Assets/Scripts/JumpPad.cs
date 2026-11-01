@@ -8,6 +8,32 @@ public class JumpPad : MonoBehaviour
     public Color activeColor = new Color(0f, 1f, 0.9f);
 
     private float lastLaunchTime = -999f;
+    private MeshRenderer meshRenderer;
+    private Color originalEmission;
+    private bool hasEmission = false;
+
+    void Start()
+    {
+        meshRenderer = GetComponent<MeshRenderer>();
+        if (meshRenderer != null && meshRenderer.material.HasProperty("_EmissionColor"))
+        {
+            originalEmission = meshRenderer.material.GetColor("_EmissionColor");
+            if (originalEmission.maxColorComponent < 0.2f)
+            {
+                originalEmission = new Color(4.8f, 2.5f, 0.2f);
+            }
+            hasEmission = true;
+        }
+    }
+
+    void Update()
+    {
+        if (hasEmission && meshRenderer != null)
+        {
+            float pulse = 0.72f + Mathf.PingPong(Time.time * 2.8f, 0.56f);
+            meshRenderer.material.SetColor("_EmissionColor", originalEmission * pulse);
+        }
+    }
 
     void Awake()
     {
