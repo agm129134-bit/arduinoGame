@@ -833,13 +833,15 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         // 2. 擴展為 14 種獨特風格地圖區塊 (0 ~ 13)
         // 3. 障礙物與寶石動態隨機擾動
         bool mirror = (Random.value > 0.5f);
-        System.Func<int, int> M = c => mirror ? -c : c;
-        System.Func<int[], int[]> MCols = cols => {
+        float M(float val) => mirror ? -val : val;
+        int M_Col(int val) => mirror ? -val : val;
+        int[] MCols(int[] cols)
+        {
             if (!mirror) return cols;
             int[] res = new int[cols.Length];
             for (int k = 0; k < cols.Length; k++) res[k] = -cols[k];
             return res;
-        };
+        }
 
         int chunkType = Random.Range(0, 14);
 
@@ -849,10 +851,10 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                 BuildSection(chunk.transform, startRow, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 for (int r = startRow + 2; r < startRow + rowsInChunk - 2; r += 4)
                 {
-                    int spikeCol = (Random.value > 0.5f) ? M(-1) : M(1);
-                    if (Random.value > 0.6f) spikeCol = (spikeCol == -1) ? M(-2) : M(2);
+                    int spikeCol = (Random.value > 0.5f) ? M_Col(-1) : M_Col(1);
+                    if (Random.value > 0.6f) spikeCol = (spikeCol == -1) ? M_Col(-2) : M_Col(2);
                     CreateHazard(chunk.transform, new Vector3(spikeCol * COL_WIDTH, 0.5f, r * ROW_LEN));
-                    CreateGem(chunk.transform, new Vector3(M(0), 0.95f, (r + 2) * ROW_LEN));
+                    CreateGem(chunk.transform, new Vector3(M(0f), 0.95f, (r + 2) * ROW_LEN));
                 }
                 break;
 
@@ -903,7 +905,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
             case 4: // 【虛空細樑獨木橋】兩側皆為無底深淵！僅中央單線道橫跨 22 米高空，極致心跳挑戰
                 BuildSection(chunk.transform, startRow, startRow + 3, new int[] { -2, -1, 0, 1, 2 });
                 // 兩側截斷，僅保留 0 號線道高空窄樑 (隨機帶微偏)
-                int bridgeCol = (Random.value > 0.7f) ? M(1) : 0;
+                int bridgeCol = (Random.value > 0.7f) ? M_Col(1) : 0;
                 BuildSection(chunk.transform, startRow + 3, startRow + 16, new int[] { bridgeCol });
                 for (int r = startRow + 4; r < startRow + 16; r += 3)
                 {
@@ -914,7 +916,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
 
             case 5: // 【空中大跳躍長廊】深淵飛越與全速衝刺 (統一 0f 高度，消除階梯下墜落差)
                 BuildSection(chunk.transform, startRow, startRow + 5, MCols(new int[] { -1, 0, 1 }));
-                CreateJumpOverGap(chunk.transform, startRow + 4, startRow + 8, M(0));
+                CreateJumpOverGap(chunk.transform, startRow + 4, startRow + 8, M_Col(0));
                 BuildSection(chunk.transform, startRow + 8, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 CreateGem(chunk.transform, new Vector3(0, 0, (startRow + 12) * ROW_LEN));
                 CreateGem(chunk.transform, new Vector3(0, 0, (startRow + 16) * ROW_LEN));
@@ -935,12 +937,12 @@ public class RollingSkyTrackGenerator : MonoBehaviour
             case 7: // 【連環雙重彈射深淵】兩段式連續空中大跳躍！爽快感翻倍
                 BuildSection(chunk.transform, startRow, startRow + 3, MCols(new int[] { -1, 0, 1 }));
                 // 第 1 級跳台：由 startRow+2 跳至 startRow+6
-                CreateJumpOverGap(chunk.transform, startRow + 2, startRow + 6, M(0));
+                CreateJumpOverGap(chunk.transform, startRow + 2, startRow + 6, M_Col(0));
 
                 // 第 3~5 排為斷層，落在第 6~8 排空中島
                 BuildSection(chunk.transform, startRow + 6, startRow + 9, MCols(new int[] { -1, 0, 1 }));
                 // 第 2 級跳台：由 startRow+8 跳至 startRow+12
-                CreateJumpOverGap(chunk.transform, startRow + 8, startRow + 12, M(0));
+                CreateJumpOverGap(chunk.transform, startRow + 8, startRow + 12, M_Col(0));
 
                 // 第 9~11 排為斷層，落在第 12 排大平台
                 BuildSection(chunk.transform, startRow + 12, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
@@ -951,7 +953,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                 {
                     int r = startRow + i;
                     int centerCol = (i < 5) ? -1 : (i < 10) ? 0 : (i < 15) ? 1 : 0;
-                    centerCol = M(centerCol);
+                    centerCol = M_Col(centerCol);
                     int[] activeCols = new int[] { centerCol - 1, centerCol, centerCol + 1 };
                     foreach (int c in activeCols)
                     {
@@ -976,7 +978,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
             case 10: // 【全新 10：量子交錯斷層帶】左右交替雙線道穿梭，中段深淵跳台飛越
                 BuildSection(chunk.transform, startRow, startRow + 4, MCols(new int[] { -2, -1, 0 }));
                 CreateHazard(chunk.transform, new Vector3(M(-COL_WIDTH * 2), 0.5f, (startRow + 2) * ROW_LEN));
-                CreateJumpOverGap(chunk.transform, startRow + 3, startRow + 8, M(-1));
+                CreateJumpOverGap(chunk.transform, startRow + 3, startRow + 8, M_Col(-1));
                 BuildSection(chunk.transform, startRow + 8, startRow + 13, MCols(new int[] { 0, 1, 2 }));
                 CreateGem(chunk.transform, new Vector3(M(COL_WIDTH * 1.5f), 0.95f, (startRow + 10) * ROW_LEN));
                 BuildSection(chunk.transform, startRow + 13, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
@@ -986,7 +988,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                 BuildSection(chunk.transform, startRow, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 for (int i = 2; i < rowsInChunk - 2; i += 3)
                 {
-                    int sCol = (i % 2 == 0) ? M(-1) : M(1);
+                    int sCol = (i % 2 == 0) ? M_Col(-1) : M_Col(1);
                     CreateHazard(chunk.transform, new Vector3(sCol * COL_WIDTH, 0.5f, (startRow + i) * ROW_LEN));
                     CreateGem(chunk.transform, new Vector3(-sCol * COL_WIDTH, 0.95f, (startRow + i) * ROW_LEN));
                 }
@@ -995,11 +997,11 @@ public class RollingSkyTrackGenerator : MonoBehaviour
             case 12: // 【全新 12：深淵孤島單一彈跳躍進】中央孤立跳台，清爽單次超遠飛躍，著陸平穩
                 BuildSection(chunk.transform, startRow, startRow + 3, new int[] { -1, 0, 1 });
                 // 孤立單跳台，前後皆為深淵
-                CreateJumpPad(chunk.transform, new Vector3(M(0), 0.1f, (startRow + 2) * ROW_LEN));
+                CreateJumpPad(chunk.transform, new Vector3(M(0f), 0.1f, (startRow + 2) * ROW_LEN));
                 // 空中拋物線寶石
-                CreateAirborneGem(chunk.transform, new Vector3(M(0), 2.8f, (startRow + 4) * ROW_LEN));
-                CreateAirborneGem(chunk.transform, new Vector3(M(0), 3.9f, (startRow + 6) * ROW_LEN));
-                CreateAirborneGem(chunk.transform, new Vector3(M(0), 2.8f, (startRow + 8) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(0f), 2.8f, (startRow + 4) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(0f), 3.9f, (startRow + 6) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(0f), 2.8f, (startRow + 8) * ROW_LEN));
                 // 安全寬敞著陸島
                 BuildSection(chunk.transform, startRow + 9, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 break;
