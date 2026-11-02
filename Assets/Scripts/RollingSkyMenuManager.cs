@@ -167,10 +167,16 @@ public class RollingSkyMenuManager : MonoBehaviour
         currentActivePanel = mainMenuPanel;
 
         RefreshMainMenuStatus();
+        InitAccordionMenuButtons();
     }
 
     void Update()
     {
+        // 實體搖桿與鍵盤選單導航
+        HandleMenuNavigationInput();
+        // 動態按鈕放大與推擠防重疊更新
+        UpdateAccordionLayout();
+
         // 特殊除錯按鍵：自由增加寶石數量 (G: +50, F1: +100, F2: +500)
         if (Input.GetKeyDown(KeyCode.G)) AddDebugGems(50);
         if (Input.GetKeyDown(KeyCode.F1)) AddDebugGems(100);
@@ -1802,5 +1808,295 @@ public class RollingSkyMenuManager : MonoBehaviour
         slider.handleRect = handleRect;
 
         return slider;
+    }
+
+    // ==================== 實體搖桿選單控制與按鈕動態推擠防重疊系統 (Accordion Push Layout) ====================
+    [System.Serializable]
+    public class MenuAccordionButton
+    {
+        public Button button;
+        public RectTransform rectTransform;
+        public Image image;
+        public Text text;
+        public Vector2 basePos;
+        public int column; // 0: 左欄 (四大遊玩模式), 1: 右欄 (系統/商店/創造)
+        public int row;    // 0 ~ 3
+        public Color normalColor = new Color(0.1f, 0.22f, 0.38f, 0.95f);
+        public Color highlightColor = new Color(0.95f, 0.65f, 0.05f, 1f); // 亮金橙高對比發光色
+        public Color normalTextColor = Color.white;
+        public Color highlightTextColor = new Color(1f, 1f, 0.85f, 1f);
+    }
+
+    private List<MenuAccordionButton> accordionButtons = new List<MenuAccordionButton>();
+    private int activeNavCol = 0; // 0: 左欄, 1: 右欄
+    private int activeNavRow = 0; // 0 ~ 3
+    private bool isMenuNavActive = true;
+    private float navCooldownTimer = 0f;
+    private bool lastJoyBtnState = false;
+    private int activeLevelSelectIndex = 1;
+
+    // 佈局參數：放大 15%、上下推擠 18px 徹底避免重疊
+    private const float SELECTED_SCALE = 1.15f;
+    private const float PUSH_OFFSET = 18f;
+    private const float ANIM_SPEED = 14f;
+
+    void InitAccordionMenuButtons()
+    {
+        if (mainMenuPanel == null) return;
+        accordionButtons.Clear();
+
+        // 左欄 4 個與右欄 4 個主選單按鈕
+        string[] leftBtnNames = new string[] { "Btn_Start", "Btn_Levels", "Btn_Endless", "Btn_SkyTower" };
+        string[] rightBtnNames = new string[] { "Btn_Shop", "Btn_Builder", "Btn_Settings", "Btn_Exit" };
+
+        for (int r = 0; r < leftBtnNames.Length; r++)
+        {
+            RegisterAccordionButton(mainMenuPanel, leftBtnNames[r], 0, r);
+        }
+        for (int r = 0; r < rightBtnNames.Length; r++)
+        {
+            RegisterAccordionButton(mainMenuPanel, rightBtnNames[r], 1, r);
+        }
+    }
+
+    void RegisterAccordionButton(GameObject panel, string btnName, int col, int row)
+    {
+        Transform t = panel.transform.Find(btnName);
+        if (t == null) return;
+
+        Button btn = t.GetComponent<Button>();
+        RectTransform rt = t.GetComponent<RectTransform>();
+        Image img = t.GetComponent<Image>();
+        Text txt = t.GetComponentInChildren<Text>();
+
+        if (btn == null || rt == null) return;
+
+        MenuAccordionButton item = new MenuAccordionButton();
+        item.button = btn;
+        item.rectTransform = rt;
+        item.image = img;
+        item.text = txt;
+        item.basePos = rt.anchoredPosition;
+        item.column = col;
+        item.row = row;
+
+        if (img != null)
+        {
+            item.normalColor = img.color;
+        }
+
+        // 綁定 EventTrigger 實現滑鼠懸停 (PointerEnter) 與搖桿焦點無縫雙向連動
+        EventTrigger trigger = t.gameObject.GetComponent<EventTrigger>();
+        if (trigger == null) trigger = t.gameObject.AddComponent<EventTrigger>();
+        trigger.triggers.Clear();
+
+        EventTrigger.Entry enterEntry = new EventTrigger.Entry();
+        enterEntry.eventID = EventTriggerType.PointerEnter;
+        int capturedCol = col;
+        int capturedRow = row;
+        enterEntry.callback.AddListener((data) => {
+            activeNavCol = capturedCol;
+            activeNavRow = capturedRow;
+            isMenuNavActive = true;
+        });
+        trigger.triggers.Add(enterEntry);
+
+        accordionButtons.Add(item);
+    }
+
+    void UpdateAccordionLayout()
+    {
+        if (mainMenuPanel == null || !mainMenuPanel.activeInHierarchy) return;
+
+        float dt = Time.unscaledDeltaTime;
+
+        for (int i = 0; i < accordionButtons.Count; i++)
+        {
+            var item = accordionButtons[i];
+            if (item.rectTransform == null) continue;
+
+            Vector2 targetPos = item.basePos;
+            float targetScale = 1.0f;
+            Color targetColor = item.normalColor;
+            Color targetTextColor = item.normalTextColor;
+
+            // 只有當前正在選取的欄位會啟動動態推擠 (Accordion Push Layout)
+            if (isMenuNavActive && item.column == activeNavCol)
+            {
+                if (item.row == activeNavRow)
+                {
+                    // 當前選中按鈕：居中放大 1.15x，發光高亮
+                    targetScale = SELECTED_SCALE;
+                    targetColor = item.highlightColor;
+                    targetTextColor = item.highlightTextColor;
+                    targetPos = item.basePos; // 本身以基準點對稱擴展
+                }
+                else if (item.row < activeNavRow)
+                {
+                    // 位於選中項【上方】的按鈕：向上平滑推開 +PUSH_OFFSET，避免被放大覆蓋
+                    targetScale = 1.0f;
+                    targetPos = new Vector2(item.basePos.x, item.basePos.y + PUSH_OFFSET);
+                }
+                else if (item.row > activeNavRow)
+                {
+                    // 位於選中項【下方】的按鈕：向下平滑推開 -PUSH_OFFSET，避免被放大覆蓋
+                    targetScale = 1.0f;
+                    targetPos = new Vector2(item.basePos.x, item.basePos.y - PUSH_OFFSET);
+                }
+            }
+
+            // 平滑插值 (Lerp) 營造極致絲滑的現代 UI 動效
+            item.rectTransform.anchoredPosition = Vector2.Lerp(item.rectTransform.anchoredPosition, targetPos, dt * ANIM_SPEED);
+            item.rectTransform.localScale = Vector3.Lerp(item.rectTransform.localScale, new Vector3(targetScale, targetScale, 1f), dt * ANIM_SPEED);
+
+            if (item.image != null)
+            {
+                item.image.color = Color.Lerp(item.image.color, targetColor, dt * ANIM_SPEED);
+            }
+            if (item.text != null)
+            {
+                item.text.color = Color.Lerp(item.text.color, targetTextColor, dt * ANIM_SPEED);
+            }
+        }
+    }
+
+    void HandleMenuNavigationInput()
+    {
+        if (navCooldownTimer > 0f)
+        {
+            navCooldownTimer -= Time.unscaledDeltaTime;
+        }
+
+        bool moveUp = false;
+        bool moveDown = false;
+        bool moveLeft = false;
+        bool moveRight = false;
+        bool confirm = false;
+
+        // 1. 讀取鍵盤操作 (WASD / 方向鍵 / Enter / Space)
+        if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) moveUp = true;
+        if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) moveDown = true;
+        if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) moveLeft = true;
+        if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) moveRight = true;
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space)) confirm = true;
+
+        // 2. 讀取 Arduino 實體搖桿操作
+        if (arduino == null) arduino = FindAnyObjectByType<ArduinoReceiver>();
+        if (arduino != null)
+        {
+            float joyX = arduino.joystick.x;
+            float joyY = arduino.joystick.y;
+            bool joyBtn = arduino.isButtonPressed;
+
+            // 實體搖桿按鍵按下 (邊緣觸發，防重複點擊)
+            if (joyBtn && !lastJoyBtnState)
+            {
+                confirm = true;
+            }
+            lastJoyBtnState = joyBtn;
+
+            // 實體搖桿推動判定 (基準值 500, 死區 150)
+            if (navCooldownTimer <= 0f)
+            {
+                if (joyY < 320f) moveUp = true;
+                else if (joyY > 680f) moveDown = true;
+
+                if (joyX < 320f) moveLeft = true;
+                else if (joyX > 680f) moveRight = true;
+            }
+        }
+
+        // 3. 主面板導航
+        if (mainMenuPanel != null && mainMenuPanel.activeInHierarchy)
+        {
+            if (navCooldownTimer <= 0f)
+            {
+                if (moveUp)
+                {
+                    activeNavRow--;
+                    if (activeNavRow < 0) activeNavRow = 3;
+                    navCooldownTimer = 0.22f;
+                    isMenuNavActive = true;
+                }
+                else if (moveDown)
+                {
+                    activeNavRow++;
+                    if (activeNavRow > 3) activeNavRow = 0;
+                    navCooldownTimer = 0.22f;
+                    isMenuNavActive = true;
+                }
+                else if (moveLeft)
+                {
+                    if (activeNavCol != 0)
+                    {
+                        activeNavCol = 0;
+                        navCooldownTimer = 0.22f;
+                        isMenuNavActive = true;
+                    }
+                }
+                else if (moveRight)
+                {
+                    if (activeNavCol != 1)
+                    {
+                        activeNavCol = 1;
+                        navCooldownTimer = 0.22f;
+                        isMenuNavActive = true;
+                    }
+                }
+            }
+
+            if (confirm)
+            {
+                TriggerSelectedMainMenuButton();
+            }
+        }
+        // 4. 關卡選擇面板導航 (Level Select Grid)
+        else if (levelSelectPanel != null && levelSelectPanel.activeInHierarchy)
+        {
+            if (navCooldownTimer <= 0f)
+            {
+                if (moveLeft && activeLevelSelectIndex > 1) { activeLevelSelectIndex--; navCooldownTimer = 0.2f; HighlightLevelSelectBtn(); }
+                else if (moveRight && activeLevelSelectIndex < 10) { activeLevelSelectIndex++; navCooldownTimer = 0.2f; HighlightLevelSelectBtn(); }
+                else if (moveUp && activeLevelSelectIndex > 5) { activeLevelSelectIndex -= 5; navCooldownTimer = 0.2f; HighlightLevelSelectBtn(); }
+                else if (moveDown && activeLevelSelectIndex <= 5) { activeLevelSelectIndex += 5; navCooldownTimer = 0.2f; HighlightLevelSelectBtn(); }
+            }
+
+            if (confirm)
+            {
+                OnSelectLevel(activeLevelSelectIndex);
+            }
+        }
+    }
+
+    void HighlightLevelSelectBtn()
+    {
+        if (levelSelectPanel == null) return;
+        for (int i = 1; i <= 10; i++)
+        {
+            Transform t = levelSelectPanel.transform.Find($"Btn_Lvl{i}");
+            if (t != null)
+            {
+                Image img = t.GetComponent<Image>();
+                RectTransform rt = t.GetComponent<RectTransform>();
+                if (img != null)
+                {
+                    img.color = (i == activeLevelSelectIndex) ? new Color(0.95f, 0.65f, 0.05f, 1f) : new Color(0.1f, 0.22f, 0.38f);
+                }
+                if (rt != null)
+                {
+                    rt.localScale = (i == activeLevelSelectIndex) ? new Vector3(1.12f, 1.12f, 1f) : Vector3.one;
+                }
+            }
+        }
+    }
+
+    void TriggerSelectedMainMenuButton()
+    {
+        var target = accordionButtons.Find(b => b.column == activeNavCol && b.row == activeNavRow);
+        if (target != null && target.button != null && target.button.interactable)
+        {
+            Debug.Log($"🎮 [MenuNav] 搖桿/鍵盤確認點擊: Col {activeNavCol}, Row {activeNavRow} ({target.button.name})");
+            target.button.onClick.Invoke();
+        }
     }
 }
