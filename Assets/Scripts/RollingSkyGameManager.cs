@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
 
 public class RollingSkyGameManager : MonoBehaviour
 {
@@ -146,6 +147,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
         // 綁定所有面板按鈕事件
         BindAllButtonsRuntime();
+        EnsureAllInGameButtonsTextSafe();
 
         // 無盡模式下隱藏左上角寶石文字（徹底消除孤立數字 0 裁切問題）
         if (gemText != null && isEndlessMode)
@@ -206,6 +208,10 @@ public class RollingSkyGameManager : MonoBehaviour
 
     void Update()
     {
+        // 遊戲內各選單面板的實體搖桿/鍵盤導航與 Accordion 推擠更新 (使用 unscaledDeltaTime，暫停中亦流暢運作)
+        HandleInGameNavigationInput();
+        UpdateInGameAccordionLayout();
+
         // 特殊除錯按鍵：自由增加寶石數量 (G: +50, F1: +100, F2: +500)
         if (Input.GetKeyDown(KeyCode.G)) AddDebugGems(50);
         if (Input.GetKeyDown(KeyCode.F1)) AddDebugGems(100);
@@ -336,6 +342,14 @@ public class RollingSkyGameManager : MonoBehaviour
         {
             pausePanel.transform.SetAsLastSibling();
             pausePanel.SetActive(isPaused);
+            if (isPaused)
+            {
+                InitPauseMenuButtons();
+                activeInGameNavCol = 0;
+                activeInGameNavRow = 0;
+                isInGameNavActive = true;
+                EnsureAllInGameButtonsTextSafe();
+            }
         }
 
         if (!isPaused && inGameSettingsPanel != null)
@@ -936,6 +950,11 @@ public class RollingSkyGameManager : MonoBehaviour
             if (sliderSfxVolume != null) sliderSfxVolume.value = PlayerPrefs.GetFloat("SFX_Volume", 0.5f);
 
             SwitchInGameSettingsTab(0);
+            InitInGameSettingsButtons();
+            activeInGameNavCol = 0;
+            activeInGameNavRow = 0;
+            isInGameNavActive = true;
+            EnsureAllInGameButtonsTextSafe();
         }
     }
 
@@ -947,6 +966,11 @@ public class RollingSkyGameManager : MonoBehaviour
         {
             pausePanel.transform.SetAsLastSibling();
             pausePanel.SetActive(true);
+            InitPauseMenuButtons();
+            activeInGameNavCol = 0;
+            activeInGameNavRow = 0;
+            isInGameNavActive = true;
+            EnsureAllInGameButtonsTextSafe();
         }
         PlayerPrefs.Save();
         FindAnyObjectByType<RollingSkyBallController>()?.ReloadSettings();
@@ -1488,6 +1512,11 @@ public class RollingSkyGameManager : MonoBehaviour
             EnsureGameOverPanelButtons(gameOverPanel, GetDefaultFont());
             gameOverPanel.transform.SetAsLastSibling();
             gameOverPanel.SetActive(true);
+            InitGameOverButtons();
+            activeInGameNavCol = 0;
+            activeInGameNavRow = 0;
+            isInGameNavActive = true;
+            EnsureAllInGameButtonsTextSafe();
             if (gameOverReasonText != null)
             {
                 gameOverReasonText.text = reason;
@@ -1624,9 +1653,413 @@ public class RollingSkyGameManager : MonoBehaviour
 
             victoryPanel.transform.SetAsLastSibling();
             victoryPanel.SetActive(true);
+            InitVictoryButtons();
+            activeInGameNavCol = 0;
+            activeInGameNavRow = 0;
+            isInGameNavActive = true;
+            EnsureAllInGameButtonsTextSafe();
         }
 
         AudioManager.Instance?.PlayVictory();
         Debug.Log($"[GameManager] 🎉 100% 完美通關第 {currentLevel} 關！");
+    }
+
+    // ==================== 遊戲內各選單實體搖桿控制、動態推擠防重疊與文字防切安全防線 ====================
+    [System.Serializable]
+    public class InGameAccordionButton
+    {
+        public Button button;
+        public RectTransform rectTransform;
+        public Image image;
+        public Text text;
+        public Vector2 basePos;
+        public int column; // 0: 單欄或左欄
+        public int row;    // 縱向列索引
+        public Color normalColor = new Color(0.1f, 0.22f, 0.38f, 0.95f);
+        public Color highlightColor = new Color(0.95f, 0.65f, 0.05f, 1f); // 亮金橙高對比發光色
+        public Color normalTextColor = Color.white;
+        public Color highlightTextColor = new Color(1f, 1f, 0.85f, 1f);
+    }
+
+    private List<InGameAccordionButton> pauseMenuButtons = new List<InGameAccordionButton>();
+    private List<InGameAccordionButton> gameOverMenuButtons = new List<InGameAccordionButton>();
+    private List<InGameAccordionButton> victoryMenuButtons = new List<InGameAccordionButton>();
+    private List<InGameAccordionButton> inGameSettingsTabButtons = new List<InGameAccordionButton>();
+
+    private int activeInGameNavCol = 0;
+    private int activeInGameNavRow = 0;
+    private bool isInGameNavActive = true;
+    private float inGameNavCooldownTimer = 0f;
+    private bool lastInGameJoyBtnState = false;
+
+    private const float SELECTED_SCALE = 1.15f;
+    private const float PUSH_OFFSET = 18f;
+    private const float ANIM_SPEED = 14f;
+
+    void InitPauseMenuButtons()
+    {
+        if (pausePanel == null) return;
+        pauseMenuButtons.Clear();
+        string[] btnNames = new string[] { "Btn_Resume", "Btn_Settings", "Btn_Restart", "Btn_MainMenu" };
+        for (int r = 0; r < btnNames.Length; r++)
+        {
+            RegisterInGameAccordionButton(pausePanel, btnNames[r], 0, r, pauseMenuButtons, (c, row) => {
+                activeInGameNavCol = c;
+                activeInGameNavRow = row;
+                isInGameNavActive = true;
+            });
+        }
+    }
+
+    void InitGameOverButtons()
+    {
+        if (gameOverPanel == null) return;
+        gameOverMenuButtons.Clear();
+        string[] btnNames = new string[] { "Btn_Restart", "Btn_MainMenu" };
+        for (int r = 0; r < btnNames.Length; r++)
+        {
+            RegisterInGameAccordionButton(gameOverPanel, btnNames[r], 0, r, gameOverMenuButtons, (c, row) => {
+                activeInGameNavCol = c;
+                activeInGameNavRow = row;
+                isInGameNavActive = true;
+            });
+        }
+    }
+
+    void InitVictoryButtons()
+    {
+        if (victoryPanel == null) return;
+        victoryMenuButtons.Clear();
+        int currentLevel = PlayerPrefs.GetInt("SelectedLevel", 1);
+        bool canGoNext = (currentLevel < 10) && !isEndlessMode;
+
+        if (canGoNext)
+        {
+            string[] btnNames = new string[] { "Btn_NextLevel", "Btn_Restart", "Btn_MainMenu" };
+            for (int r = 0; r < btnNames.Length; r++)
+            {
+                RegisterInGameAccordionButton(victoryPanel, btnNames[r], 0, r, victoryMenuButtons, (c, row) => {
+                    activeInGameNavCol = c;
+                    activeInGameNavRow = row;
+                    isInGameNavActive = true;
+                });
+            }
+        }
+        else
+        {
+            string[] btnNames = new string[] { "Btn_Restart", "Btn_MainMenu" };
+            for (int r = 0; r < btnNames.Length; r++)
+            {
+                RegisterInGameAccordionButton(victoryPanel, btnNames[r], 0, r, victoryMenuButtons, (c, row) => {
+                    activeInGameNavCol = c;
+                    activeInGameNavRow = row;
+                    isInGameNavActive = true;
+                });
+            }
+        }
+    }
+
+    void InitInGameSettingsButtons()
+    {
+        if (inGameSettingsPanel == null) return;
+        inGameSettingsTabButtons.Clear();
+        string[] tabNames = new string[] { "Btn_TabDisplay", "Btn_TabKeyboard", "Btn_TabController", "Btn_TabAudio" };
+        for (int c = 0; c < tabNames.Length; c++)
+        {
+            RegisterInGameAccordionButton(inGameSettingsPanel, tabNames[c], c, 0, inGameSettingsTabButtons, (col, row) => {
+                activeInGameNavCol = col;
+                activeInGameNavRow = 0;
+                isInGameNavActive = true;
+            });
+        }
+        RegisterInGameAccordionButton(inGameSettingsPanel, "Btn_BackFromSettings", 0, 1, inGameSettingsTabButtons, (col, row) => {
+            activeInGameNavCol = 0;
+            activeInGameNavRow = 1;
+            isInGameNavActive = true;
+        });
+    }
+
+    void RegisterInGameAccordionButton(GameObject panel, string btnName, int col, int row, List<InGameAccordionButton> list, System.Action<int, int> onHover)
+    {
+        Transform t = panel.transform.Find(btnName);
+        if (t == null) return;
+
+        Button btn = t.GetComponent<Button>();
+        RectTransform rt = t.GetComponent<RectTransform>();
+        Image img = t.GetComponent<Image>();
+        Text txt = t.GetComponentInChildren<Text>();
+
+        if (btn == null || rt == null) return;
+
+        // 文字防切核心加固：強制溢出模式
+        if (txt != null)
+        {
+            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            txt.verticalOverflow = VerticalWrapMode.Overflow;
+        }
+
+        InGameAccordionButton item = new InGameAccordionButton();
+        item.button = btn;
+        item.rectTransform = rt;
+        item.image = img;
+        item.text = txt;
+        item.basePos = rt.anchoredPosition;
+        item.column = col;
+        item.row = row;
+
+        if (img != null) item.normalColor = img.color;
+
+        EventTrigger trigger = t.gameObject.GetComponent<EventTrigger>();
+        if (trigger == null) trigger = t.gameObject.AddComponent<EventTrigger>();
+        trigger.triggers.Clear();
+
+        EventTrigger.Entry enterEntry = new EventTrigger.Entry();
+        enterEntry.eventID = EventTriggerType.PointerEnter;
+        int capturedCol = col;
+        int capturedRow = row;
+        enterEntry.callback.AddListener((data) => {
+            if (onHover != null) onHover(capturedCol, capturedRow);
+        });
+        trigger.triggers.Add(enterEntry);
+
+        list.Add(item);
+    }
+
+    void EnsureAllInGameButtonsTextSafe()
+    {
+        if (pausePanel != null) EnsurePanelTextsSafe(pausePanel);
+        if (gameOverPanel != null) EnsurePanelTextsSafe(gameOverPanel);
+        if (victoryPanel != null) EnsurePanelTextsSafe(victoryPanel);
+        if (inGameSettingsPanel != null) EnsurePanelTextsSafe(inGameSettingsPanel);
+    }
+
+    void EnsurePanelTextsSafe(GameObject panel)
+    {
+        if (panel == null) return;
+        Text[] allTexts = panel.GetComponentsInChildren<Text>(true);
+        foreach (var txt in allTexts)
+        {
+            if (txt == null) continue;
+            // 按鈕內部文字強制設定 Overflow，並確保寬度充裕絕不被裁剪
+            if (txt.transform.parent != null && txt.transform.parent.GetComponent<Button>() != null)
+            {
+                txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+                txt.verticalOverflow = VerticalWrapMode.Overflow;
+                RectTransform trt = txt.GetComponent<RectTransform>();
+                if (trt != null)
+                {
+                    trt.sizeDelta = new Vector2(Mathf.Max(trt.sizeDelta.x, 240f), Mathf.Max(trt.sizeDelta.y, 40f));
+                }
+            }
+        }
+    }
+
+    void UpdateInGameAccordionLayout()
+    {
+        float dt = Time.unscaledDeltaTime;
+
+        if (inGameSettingsPanel != null && inGameSettingsPanel.activeSelf)
+        {
+            UpdateInGameGroupAccordion(inGameSettingsTabButtons, activeInGameNavCol, activeInGameNavRow, dt);
+        }
+        else if (pausePanel != null && pausePanel.activeSelf)
+        {
+            UpdateInGameGroupAccordion(pauseMenuButtons, activeInGameNavCol, activeInGameNavRow, dt);
+        }
+        else if (gameOverPanel != null && gameOverPanel.activeSelf)
+        {
+            UpdateInGameGroupAccordion(gameOverMenuButtons, activeInGameNavCol, activeInGameNavRow, dt);
+        }
+        else if (victoryPanel != null && victoryPanel.activeSelf)
+        {
+            UpdateInGameGroupAccordion(victoryMenuButtons, activeInGameNavCol, activeInGameNavRow, dt);
+        }
+    }
+
+    void UpdateInGameGroupAccordion(List<InGameAccordionButton> buttonList, int currentCol, int currentRow, float dt)
+    {
+        for (int i = 0; i < buttonList.Count; i++)
+        {
+            var item = buttonList[i];
+            if (item.rectTransform == null) continue;
+
+            Vector2 targetPos = item.basePos;
+            float targetScale = 1.0f;
+            Color targetColor = item.normalColor;
+            Color targetTextColor = item.normalTextColor;
+
+            if (isInGameNavActive && (item.column == currentCol || item.row == currentRow))
+            {
+                if (item.row == currentRow && (item.column == currentCol || buttonList.Count <= 4))
+                {
+                    targetScale = SELECTED_SCALE;
+                    targetColor = item.highlightColor;
+                    targetTextColor = item.highlightTextColor;
+                    targetPos = item.basePos;
+                }
+                else if (item.row < currentRow)
+                {
+                    targetScale = 1.0f;
+                    targetPos = new Vector2(item.basePos.x, item.basePos.y + PUSH_OFFSET);
+                }
+                else if (item.row > currentRow)
+                {
+                    targetScale = 1.0f;
+                    targetPos = new Vector2(item.basePos.x, item.basePos.y - PUSH_OFFSET);
+                }
+            }
+
+            item.rectTransform.anchoredPosition = Vector2.Lerp(item.rectTransform.anchoredPosition, targetPos, dt * ANIM_SPEED);
+            item.rectTransform.localScale = Vector3.Lerp(item.rectTransform.localScale, new Vector3(targetScale, targetScale, 1f), dt * ANIM_SPEED);
+
+            if (item.image != null)
+                item.image.color = Color.Lerp(item.image.color, targetColor, dt * ANIM_SPEED);
+            if (item.text != null)
+                item.text.color = Color.Lerp(item.text.color, targetTextColor, dt * ANIM_SPEED);
+        }
+    }
+
+    void HandleInGameNavigationInput()
+    {
+        bool hasActivePanel = (pausePanel != null && pausePanel.activeSelf) ||
+                              (gameOverPanel != null && gameOverPanel.activeSelf) ||
+                              (victoryPanel != null && victoryPanel.activeSelf) ||
+                              (inGameSettingsPanel != null && inGameSettingsPanel.activeSelf);
+        if (!hasActivePanel) return;
+
+        if (inGameNavCooldownTimer > 0f)
+        {
+            inGameNavCooldownTimer -= Time.unscaledDeltaTime;
+        }
+
+        bool moveUp = false;
+        bool moveDown = false;
+        bool moveLeft = false;
+        bool moveRight = false;
+        bool confirm = false;
+
+        // 1. 鍵盤輸入
+        if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) moveUp = true;
+        if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) moveDown = true;
+        if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) moveLeft = true;
+        if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) moveRight = true;
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space)) confirm = true;
+
+        // 2. Arduino 實體搖桿輸入
+        if (arduino == null) arduino = FindAnyObjectByType<ArduinoReceiver>();
+        if (arduino != null)
+        {
+            float joyX = arduino.joystick.x;
+            float joyY = arduino.joystick.y;
+            bool joyBtn = arduino.isButtonPressed;
+
+            if (joyBtn && !lastInGameJoyBtnState)
+            {
+                confirm = true;
+            }
+            lastInGameJoyBtnState = joyBtn;
+
+            if (inGameNavCooldownTimer <= 0f)
+            {
+                if (joyY < 320f) moveUp = true;
+                else if (joyY > 680f) moveDown = true;
+
+                if (joyX < 320f) moveLeft = true;
+                else if (joyX > 680f) moveRight = true;
+            }
+        }
+
+        // 3. 各面板導航分發
+        if (inGameSettingsPanel != null && inGameSettingsPanel.activeSelf)
+        {
+            if (inGameNavCooldownTimer <= 0f)
+            {
+                if (moveLeft && activeInGameNavCol > 0 && activeInGameNavRow == 0)
+                {
+                    activeInGameNavCol--;
+                    SwitchInGameSettingsTab(activeInGameNavCol);
+                    inGameNavCooldownTimer = 0.22f;
+                    isInGameNavActive = true;
+                }
+                else if (moveRight && activeInGameNavCol < 3 && activeInGameNavRow == 0)
+                {
+                    activeInGameNavCol++;
+                    SwitchInGameSettingsTab(activeInGameNavCol);
+                    inGameNavCooldownTimer = 0.22f;
+                    isInGameNavActive = true;
+                }
+                else if (moveDown && activeInGameNavRow == 0)
+                {
+                    activeInGameNavRow = 1; // 切換至返回按鈕
+                    activeInGameNavCol = 0;
+                    inGameNavCooldownTimer = 0.22f;
+                    isInGameNavActive = true;
+                }
+                else if (moveUp && activeInGameNavRow == 1)
+                {
+                    activeInGameNavRow = 0; // 回到頂部 Tab
+                    inGameNavCooldownTimer = 0.22f;
+                    isInGameNavActive = true;
+                }
+            }
+
+            if (confirm)
+            {
+                TriggerSelectedInGameButton(inGameSettingsTabButtons, activeInGameNavCol, activeInGameNavRow);
+            }
+        }
+        else if (pausePanel != null && pausePanel.activeSelf)
+        {
+            HandleInGameGroupNavigation(moveUp, moveDown, false, false, confirm, 1, pauseMenuButtons.Count, pauseMenuButtons);
+        }
+        else if (gameOverPanel != null && gameOverPanel.activeSelf)
+        {
+            HandleInGameGroupNavigation(moveUp, moveDown, false, false, confirm, 1, gameOverMenuButtons.Count, gameOverMenuButtons);
+        }
+        else if (victoryPanel != null && victoryPanel.activeSelf)
+        {
+            HandleInGameGroupNavigation(moveUp, moveDown, false, false, confirm, 1, victoryMenuButtons.Count, victoryMenuButtons);
+        }
+    }
+
+    void HandleInGameGroupNavigation(bool moveUp, bool moveDown, bool moveLeft, bool moveRight, bool confirm, int maxCols, int maxRows, List<InGameAccordionButton> group)
+    {
+        if (group == null || group.Count == 0 || maxRows <= 0) return;
+
+        if (inGameNavCooldownTimer <= 0f)
+        {
+            if (moveUp)
+            {
+                activeInGameNavRow--;
+                if (activeInGameNavRow < 0) activeInGameNavRow = maxRows - 1;
+                inGameNavCooldownTimer = 0.22f;
+                isInGameNavActive = true;
+            }
+            else if (moveDown)
+            {
+                activeInGameNavRow++;
+                if (activeInGameNavRow >= maxRows) activeInGameNavRow = 0;
+                inGameNavCooldownTimer = 0.22f;
+                isInGameNavActive = true;
+            }
+        }
+
+        if (confirm)
+        {
+            TriggerSelectedInGameButton(group, activeInGameNavCol, activeInGameNavRow);
+        }
+    }
+
+    void TriggerSelectedInGameButton(List<InGameAccordionButton> group, int col, int row)
+    {
+        var target = group.Find(b => b.column == col && b.row == row);
+        if (target == null) target = group.Find(b => b.row == row);
+
+        if (target != null && target.button != null && target.button.interactable)
+        {
+            Debug.Log($"🎮 [InGameNav] 觸發按鈕: ({target.button.name})");
+            target.button.onClick.Invoke();
+            inGameNavCooldownTimer = 0.28f;
+        }
     }
 }

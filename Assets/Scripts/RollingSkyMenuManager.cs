@@ -1201,6 +1201,11 @@ public class RollingSkyMenuManager : MonoBehaviour
         {
             RefreshMainMenuStatus();
         }
+
+        activeNavCol = 0;
+        activeNavRow = 0;
+        isMenuNavActive = true;
+        EnsureAllButtonsTextSafe();
     }
 
     public void SwitchSettingsTab(int tabIndex)
@@ -1810,7 +1815,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         return slider;
     }
 
-    // ==================== 實體搖桿選單控制與按鈕動態推擠防重疊系統 (Accordion Push Layout) ====================
+    // ==================== 全選單實體搖桿控制、動態推擠防重疊與文字防切安全防線 ====================
     [System.Serializable]
     public class MenuAccordionButton
     {
@@ -1819,21 +1824,24 @@ public class RollingSkyMenuManager : MonoBehaviour
         public Image image;
         public Text text;
         public Vector2 basePos;
-        public int column; // 0: 左欄 (四大遊玩模式), 1: 右欄 (系統/商店/創造)
-        public int row;    // 0 ~ 3
+        public int column; // 0: 左欄, 1: 右欄
+        public int row;    // 縱向列索引
         public Color normalColor = new Color(0.1f, 0.22f, 0.38f, 0.95f);
         public Color highlightColor = new Color(0.95f, 0.65f, 0.05f, 1f); // 亮金橙高對比發光色
         public Color normalTextColor = Color.white;
         public Color highlightTextColor = new Color(1f, 1f, 0.85f, 1f);
     }
 
-    private List<MenuAccordionButton> accordionButtons = new List<MenuAccordionButton>();
+    private List<MenuAccordionButton> mainMenuButtons = new List<MenuAccordionButton>();
+    private List<MenuAccordionButton> levelSelectButtons = new List<MenuAccordionButton>();
+    private List<MenuAccordionButton> shopButtons = new List<MenuAccordionButton>();
+    private List<MenuAccordionButton> settingsTabButtons = new List<MenuAccordionButton>();
+
     private int activeNavCol = 0; // 0: 左欄, 1: 右欄
-    private int activeNavRow = 0; // 0 ~ 3
+    private int activeNavRow = 0; // 縱向索引
     private bool isMenuNavActive = true;
     private float navCooldownTimer = 0f;
     private bool lastJoyBtnState = false;
-    private int activeLevelSelectIndex = 1;
 
     // 佈局參數：放大 15%、上下推擠 18px 徹底避免重疊
     private const float SELECTED_SCALE = 1.15f;
@@ -1842,24 +1850,75 @@ public class RollingSkyMenuManager : MonoBehaviour
 
     void InitAccordionMenuButtons()
     {
-        if (mainMenuPanel == null) return;
-        accordionButtons.Clear();
-
-        // 左欄 4 個與右欄 4 個主選單按鈕
-        string[] leftBtnNames = new string[] { "Btn_Start", "Btn_Levels", "Btn_Endless", "Btn_SkyTower" };
-        string[] rightBtnNames = new string[] { "Btn_Shop", "Btn_Builder", "Btn_Settings", "Btn_Exit" };
-
-        for (int r = 0; r < leftBtnNames.Length; r++)
+        // 1. 初始化主選單面板按鈕
+        if (mainMenuPanel != null)
         {
-            RegisterAccordionButton(mainMenuPanel, leftBtnNames[r], 0, r);
+            mainMenuButtons.Clear();
+            string[] leftBtnNames = new string[] { "Btn_Start", "Btn_Levels", "Btn_Endless", "Btn_SkyTower" };
+            string[] rightBtnNames = new string[] { "Btn_Shop", "Btn_Builder", "Btn_Settings", "Btn_Exit" };
+
+            for (int r = 0; r < leftBtnNames.Length; r++)
+                RegisterAccordionButton(mainMenuPanel, leftBtnNames[r], 0, r, mainMenuButtons, (c, row) => { activeNavCol = c; activeNavRow = row; isMenuNavActive = true; });
+            for (int r = 0; r < rightBtnNames.Length; r++)
+                RegisterAccordionButton(mainMenuPanel, rightBtnNames[r], 1, r, mainMenuButtons, (c, row) => { activeNavCol = c; activeNavRow = row; isMenuNavActive = true; });
         }
-        for (int r = 0; r < rightBtnNames.Length; r++)
+
+        // 2. 初始化選擇關卡面板 (10 大挑戰關卡: 左5關、右5關 + 底部返回鍵)
+        if (levelSelectPanel != null)
         {
-            RegisterAccordionButton(mainMenuPanel, rightBtnNames[r], 1, r);
+            levelSelectButtons.Clear();
+            // 左欄 LV.1 ~ LV.5
+            for (int i = 1; i <= 5; i++)
+                RegisterAccordionButton(levelSelectPanel, $"Btn_Lvl{i}", 0, i - 1, levelSelectButtons, (c, row) => { activeNavCol = c; activeNavRow = row; isMenuNavActive = true; });
+            // 右欄 LV.6 ~ LV.10
+            for (int i = 6; i <= 10; i++)
+                RegisterAccordionButton(levelSelectPanel, $"Btn_Lvl{i}", 1, i - 6, levelSelectButtons, (c, row) => { activeNavCol = c; activeNavRow = row; isMenuNavActive = true; });
+            // 底部返回按鈕 (Row 5)
+            RegisterAccordionButton(levelSelectPanel, "Btn_Back", 0, 5, levelSelectButtons, (c, row) => { activeNavCol = 0; activeNavRow = 5; isMenuNavActive = true; });
+        }
+
+        // 3. 初始化皮膚商店面板 (5 款皮膚卡片 + 底部返回鍵)
+        if (shopPanel != null)
+        {
+            shopButtons.Clear();
+            for (int i = 0; i < 5; i++)
+                RegisterAccordionButton(shopPanel, $"Btn_Skin_{i}", 0, i, shopButtons, (c, row) => { activeNavCol = 0; activeNavRow = row; isMenuNavActive = true; });
+            RegisterAccordionButton(shopPanel, "Btn_ShopBack", 0, 5, shopButtons, (c, row) => { activeNavCol = 0; activeNavRow = 5; isMenuNavActive = true; });
+        }
+
+        // 4. 初始化系統設定 Tab 分頁按鈕
+        if (settingsPanel != null)
+        {
+            settingsTabButtons.Clear();
+            string[] tabNames = new string[] { "Btn_TabDisplay", "Btn_TabKeyboard", "Btn_TabController", "Btn_TabAudio" };
+            for (int i = 0; i < tabNames.Length; i++)
+                RegisterAccordionButton(settingsPanel, tabNames[i], i, 0, settingsTabButtons, (c, row) => { activeNavCol = c; activeNavRow = 0; isMenuNavActive = true; });
+            RegisterAccordionButton(settingsPanel, "Btn_Back", 0, 1, settingsTabButtons, (c, row) => { activeNavCol = 0; activeNavRow = 1; isMenuNavActive = true; });
+        }
+
+        // 全域文字防切除防線生效
+        EnsureAllButtonsTextSafe();
+    }
+
+    void EnsureAllButtonsTextSafe()
+    {
+        // 嚴密遍歷所有選單中的文字元件，強制溢出模式與寬裕留白，徹底杜絕文字被邊框切除！
+        Text[] allTexts = GetComponentsInChildren<Text>(true);
+        foreach (var txt in allTexts)
+        {
+            if (txt == null) continue;
+            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            txt.verticalOverflow = VerticalWrapMode.Overflow;
+            RectTransform trt = txt.GetComponent<RectTransform>();
+            if (trt != null)
+            {
+                // 保證內部容器寬高充裕，避免緊貼邊框
+                trt.sizeDelta = new Vector2(Mathf.Max(trt.sizeDelta.x, 240f), Mathf.Max(trt.sizeDelta.y, 40f));
+            }
         }
     }
 
-    void RegisterAccordionButton(GameObject panel, string btnName, int col, int row)
+    void RegisterAccordionButton(GameObject panel, string btnName, int col, int row, List<MenuAccordionButton> list, System.Action<int, int> onHover)
     {
         Transform t = panel.transform.Find(btnName);
         if (t == null) return;
@@ -1871,6 +1930,13 @@ public class RollingSkyMenuManager : MonoBehaviour
 
         if (btn == null || rt == null) return;
 
+        // 文字防切核心加固
+        if (txt != null)
+        {
+            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            txt.verticalOverflow = VerticalWrapMode.Overflow;
+        }
+
         MenuAccordionButton item = new MenuAccordionButton();
         item.button = btn;
         item.rectTransform = rt;
@@ -1880,10 +1946,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         item.column = col;
         item.row = row;
 
-        if (img != null)
-        {
-            item.normalColor = img.color;
-        }
+        if (img != null) item.normalColor = img.color;
 
         // 綁定 EventTrigger 實現滑鼠懸停 (PointerEnter) 與搖桿焦點無縫雙向連動
         EventTrigger trigger = t.gameObject.GetComponent<EventTrigger>();
@@ -1895,24 +1958,41 @@ public class RollingSkyMenuManager : MonoBehaviour
         int capturedCol = col;
         int capturedRow = row;
         enterEntry.callback.AddListener((data) => {
-            activeNavCol = capturedCol;
-            activeNavRow = capturedRow;
-            isMenuNavActive = true;
+            if (onHover != null) onHover(capturedCol, capturedRow);
         });
         trigger.triggers.Add(enterEntry);
 
-        accordionButtons.Add(item);
+        list.Add(item);
     }
 
     void UpdateAccordionLayout()
     {
-        if (mainMenuPanel == null || !mainMenuPanel.activeInHierarchy) return;
-
         float dt = Time.unscaledDeltaTime;
 
-        for (int i = 0; i < accordionButtons.Count; i++)
+        // 依據當前活動面板精準更新動態推擠 (Accordion Push Layout)
+        if (mainMenuPanel != null && mainMenuPanel.activeInHierarchy)
         {
-            var item = accordionButtons[i];
+            UpdateGroupAccordion(mainMenuButtons, activeNavCol, activeNavRow, dt);
+        }
+        else if (levelSelectPanel != null && levelSelectPanel.activeInHierarchy)
+        {
+            UpdateGroupAccordion(levelSelectButtons, activeNavCol, activeNavRow, dt);
+        }
+        else if (shopPanel != null && shopPanel.activeInHierarchy)
+        {
+            UpdateGroupAccordion(shopButtons, 0, activeNavRow, dt);
+        }
+        else if (settingsPanel != null && settingsPanel.activeInHierarchy)
+        {
+            UpdateGroupAccordion(settingsTabButtons, activeNavCol, activeNavRow, dt);
+        }
+    }
+
+    void UpdateGroupAccordion(List<MenuAccordionButton> buttonList, int currentCol, int currentRow, float dt)
+    {
+        for (int i = 0; i < buttonList.Count; i++)
+        {
+            var item = buttonList[i];
             if (item.rectTransform == null) continue;
 
             Vector2 targetPos = item.basePos;
@@ -1920,26 +2000,26 @@ public class RollingSkyMenuManager : MonoBehaviour
             Color targetColor = item.normalColor;
             Color targetTextColor = item.normalTextColor;
 
-            // 只有當前正在選取的欄位會啟動動態推擠 (Accordion Push Layout)
-            if (isMenuNavActive && item.column == activeNavCol)
+            // 只有同欄或同一操作流的按鈕參與垂直推擠
+            if (isMenuNavActive && item.column == currentCol)
             {
-                if (item.row == activeNavRow)
+                if (item.row == currentRow)
                 {
                     // 當前選中按鈕：居中放大 1.15x，發光高亮
                     targetScale = SELECTED_SCALE;
                     targetColor = item.highlightColor;
                     targetTextColor = item.highlightTextColor;
-                    targetPos = item.basePos; // 本身以基準點對稱擴展
+                    targetPos = item.basePos;
                 }
-                else if (item.row < activeNavRow)
+                else if (item.row < currentRow)
                 {
-                    // 位於選中項【上方】的按鈕：向上平滑推開 +PUSH_OFFSET，避免被放大覆蓋
+                    // 位於選中項【上方】：向上平滑推開 +PUSH_OFFSET，絕對不被覆蓋
                     targetScale = 1.0f;
                     targetPos = new Vector2(item.basePos.x, item.basePos.y + PUSH_OFFSET);
                 }
-                else if (item.row > activeNavRow)
+                else if (item.row > currentRow)
                 {
-                    // 位於選中項【下方】的按鈕：向下平滑推開 -PUSH_OFFSET，避免被放大覆蓋
+                    // 位於選中項【下方】：向下平滑推開 -PUSH_OFFSET，絕對不被覆蓋
                     targetScale = 1.0f;
                     targetPos = new Vector2(item.basePos.x, item.basePos.y - PUSH_OFFSET);
                 }
@@ -1950,13 +2030,9 @@ public class RollingSkyMenuManager : MonoBehaviour
             item.rectTransform.localScale = Vector3.Lerp(item.rectTransform.localScale, new Vector3(targetScale, targetScale, 1f), dt * ANIM_SPEED);
 
             if (item.image != null)
-            {
                 item.image.color = Color.Lerp(item.image.color, targetColor, dt * ANIM_SPEED);
-            }
             if (item.text != null)
-            {
                 item.text.color = Color.Lerp(item.text.color, targetTextColor, dt * ANIM_SPEED);
-            }
         }
     }
 
@@ -2006,97 +2082,114 @@ public class RollingSkyMenuManager : MonoBehaviour
             }
         }
 
-        // 3. 主面板導航
+        // 3. 各面板全域導航派發
         if (mainMenuPanel != null && mainMenuPanel.activeInHierarchy)
         {
-            if (navCooldownTimer <= 0f)
-            {
-                if (moveUp)
-                {
-                    activeNavRow--;
-                    if (activeNavRow < 0) activeNavRow = 3;
-                    navCooldownTimer = 0.22f;
-                    isMenuNavActive = true;
-                }
-                else if (moveDown)
-                {
-                    activeNavRow++;
-                    if (activeNavRow > 3) activeNavRow = 0;
-                    navCooldownTimer = 0.22f;
-                    isMenuNavActive = true;
-                }
-                else if (moveLeft)
-                {
-                    if (activeNavCol != 0)
-                    {
-                        activeNavCol = 0;
-                        navCooldownTimer = 0.22f;
-                        isMenuNavActive = true;
-                    }
-                }
-                else if (moveRight)
-                {
-                    if (activeNavCol != 1)
-                    {
-                        activeNavCol = 1;
-                        navCooldownTimer = 0.22f;
-                        isMenuNavActive = true;
-                    }
-                }
-            }
-
-            if (confirm)
-            {
-                TriggerSelectedMainMenuButton();
-            }
+            HandleGroupNavigation(moveUp, moveDown, moveLeft, moveRight, confirm, 2, 4, mainMenuButtons);
         }
-        // 4. 關卡選擇面板導航 (Level Select Grid)
         else if (levelSelectPanel != null && levelSelectPanel.activeInHierarchy)
         {
+            HandleGroupNavigation(moveUp, moveDown, moveLeft, moveRight, confirm, 2, 6, levelSelectButtons);
+        }
+        else if (shopPanel != null && shopPanel.activeInHierarchy)
+        {
+            HandleGroupNavigation(moveUp, moveDown, false, false, confirm, 1, 6, shopButtons);
+        }
+        else if (settingsPanel != null && settingsPanel.activeInHierarchy)
+        {
             if (navCooldownTimer <= 0f)
             {
-                if (moveLeft && activeLevelSelectIndex > 1) { activeLevelSelectIndex--; navCooldownTimer = 0.2f; HighlightLevelSelectBtn(); }
-                else if (moveRight && activeLevelSelectIndex < 10) { activeLevelSelectIndex++; navCooldownTimer = 0.2f; HighlightLevelSelectBtn(); }
-                else if (moveUp && activeLevelSelectIndex > 5) { activeLevelSelectIndex -= 5; navCooldownTimer = 0.2f; HighlightLevelSelectBtn(); }
-                else if (moveDown && activeLevelSelectIndex <= 5) { activeLevelSelectIndex += 5; navCooldownTimer = 0.2f; HighlightLevelSelectBtn(); }
+                // 設定面板支援左右撥動直接切換 4 大 Tab 分頁！
+                if (moveLeft && activeNavCol > 0)
+                {
+                    activeNavCol--;
+                    SwitchSettingsTab(activeNavCol);
+                    navCooldownTimer = 0.22f;
+                }
+                else if (moveRight && activeNavCol < 3)
+                {
+                    activeNavCol++;
+                    SwitchSettingsTab(activeNavCol);
+                    navCooldownTimer = 0.22f;
+                }
+                else if (moveDown && activeNavRow == 0)
+                {
+                    activeNavRow = 1; // 切換至底部返回鍵
+                    navCooldownTimer = 0.22f;
+                }
+                else if (moveUp && activeNavRow == 1)
+                {
+                    activeNavRow = 0; // 回到頂部 Tab
+                    navCooldownTimer = 0.22f;
+                }
             }
 
             if (confirm)
             {
-                OnSelectLevel(activeLevelSelectIndex);
+                TriggerSelectedButtonInGroup(settingsTabButtons, activeNavCol, activeNavRow);
             }
         }
     }
 
-    void HighlightLevelSelectBtn()
+    void HandleGroupNavigation(bool moveUp, bool moveDown, bool moveLeft, bool moveRight, bool confirm, int maxCols, int maxRows, List<MenuAccordionButton> group)
     {
-        if (levelSelectPanel == null) return;
-        for (int i = 1; i <= 10; i++)
+        if (group == null || group.Count == 0 || maxRows <= 0) return;
+
+        if (navCooldownTimer <= 0f)
         {
-            Transform t = levelSelectPanel.transform.Find($"Btn_Lvl{i}");
-            if (t != null)
+            if (moveUp)
             {
-                Image img = t.GetComponent<Image>();
-                RectTransform rt = t.GetComponent<RectTransform>();
-                if (img != null)
+                activeNavRow--;
+                if (activeNavRow < 0) activeNavRow = maxRows - 1;
+                if (!group.Exists(b => b.column == activeNavCol && b.row == activeNavRow)) activeNavCol = 0;
+                navCooldownTimer = 0.22f;
+                isMenuNavActive = true;
+            }
+            else if (moveDown)
+            {
+                activeNavRow++;
+                if (activeNavRow >= maxRows) activeNavRow = 0;
+                if (!group.Exists(b => b.column == activeNavCol && b.row == activeNavRow)) activeNavCol = 0;
+                navCooldownTimer = 0.22f;
+                isMenuNavActive = true;
+            }
+            else if (moveLeft && maxCols > 1)
+            {
+                if (activeNavCol > 0)
                 {
-                    img.color = (i == activeLevelSelectIndex) ? new Color(0.95f, 0.65f, 0.05f, 1f) : new Color(0.1f, 0.22f, 0.38f);
+                    activeNavCol--;
+                    navCooldownTimer = 0.22f;
+                    isMenuNavActive = true;
                 }
-                if (rt != null)
+            }
+            else if (moveRight && maxCols > 1)
+            {
+                if (activeNavCol < maxCols - 1)
                 {
-                    rt.localScale = (i == activeLevelSelectIndex) ? new Vector3(1.12f, 1.12f, 1f) : Vector3.one;
+                    activeNavCol++;
+                    navCooldownTimer = 0.22f;
+                    isMenuNavActive = true;
                 }
             }
         }
+
+        if (confirm)
+        {
+            TriggerSelectedButtonInGroup(group, activeNavCol, activeNavRow);
+        }
     }
 
-    void TriggerSelectedMainMenuButton()
+    void TriggerSelectedButtonInGroup(List<MenuAccordionButton> group, int col, int row)
     {
-        var target = accordionButtons.Find(b => b.column == activeNavCol && b.row == activeNavRow);
+        var target = group.Find(b => b.column == col && b.row == row);
+        // 若找不到完全匹配 (例如底部返回按鈕跨欄)，嘗試放寬尋找該 row
+        if (target == null) target = group.Find(b => b.row == row);
+
         if (target != null && target.button != null && target.button.interactable)
         {
-            Debug.Log($"🎮 [MenuNav] 搖桿/鍵盤確認點擊: Col {activeNavCol}, Row {activeNavRow} ({target.button.name})");
+            Debug.Log($"🎮 [MenuNav] 搖桿/鍵盤觸發按鈕: ({target.button.name})");
             target.button.onClick.Invoke();
+            navCooldownTimer = 0.28f;
         }
     }
 }
