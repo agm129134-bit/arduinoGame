@@ -2043,11 +2043,11 @@ public class RollingSkyMenuManager : MonoBehaviour
         }
         else if (settingsPanel != null && settingsPanel.activeInHierarchy)
         {
-            UpdateGroupAccordion(activeSettingsButtons, activeNavCol, activeNavRow, dt);
+            UpdateGroupAccordion(activeSettingsButtons, activeNavCol, activeNavRow, dt, allowPush: false);
         }
     }
 
-    void UpdateGroupAccordion(List<MenuAccordionButton> buttonList, int currentCol, int currentRow, float dt)
+    void UpdateGroupAccordion(List<MenuAccordionButton> buttonList, int currentCol, int currentRow, float dt, bool allowPush = true)
     {
         for (int i = 0; i < buttonList.Count; i++)
         {
@@ -2063,29 +2063,34 @@ public class RollingSkyMenuManager : MonoBehaviour
             {
                 if (item.row == currentRow && item.column == currentCol)
                 {
-                    // 當前選中按鈕：居中放大 1.15x，發光高亮
-                    targetScale = SELECTED_SCALE;
+                    // 當前選中按鈕：
+                    // 設定選單 (allowPush == false)：採用優雅就地高光微縮放 1.07x，保持多欄對齊不移位
+                    // 一般選單 (allowPush == true)：居中放大 1.15x，發光高亮
+                    targetScale = allowPush ? SELECTED_SCALE : 1.07f;
                     targetColor = item.highlightColor;
                     targetTextColor = item.highlightTextColor;
                     targetPos = item.basePos;
                 }
-                else if (item.row == currentRow && item.column != currentCol)
+                else if (allowPush)
                 {
-                    // 同一行左右相鄰按鈕：向左右推開 16px 避免重疊
-                    float sign = (item.column > currentCol) ? 1f : -1f;
-                    targetPos = new Vector2(item.basePos.x + sign * 16f, item.basePos.y);
-                }
-                else if (item.column == currentCol && item.row < currentRow)
-                {
-                    // 位於選中項【上方】：向上平滑推開 +PUSH_OFFSET，絕對不被覆蓋
-                    targetScale = 1.0f;
-                    targetPos = new Vector2(item.basePos.x, item.basePos.y + PUSH_OFFSET);
-                }
-                else if (item.column == currentCol && item.row > currentRow)
-                {
-                    // 位於選中項【下方】：向下平滑推開 -PUSH_OFFSET，絕對不被覆蓋
-                    targetScale = 1.0f;
-                    targetPos = new Vector2(item.basePos.x, item.basePos.y - PUSH_OFFSET);
+                    if (item.row == currentRow && item.column != currentCol)
+                    {
+                        // 同一行左右相鄰按鈕：向左右推開 16px 避免重疊
+                        float sign = (item.column > currentCol) ? 1f : -1f;
+                        targetPos = new Vector2(item.basePos.x + sign * 16f, item.basePos.y);
+                    }
+                    else if (item.column == currentCol && item.row < currentRow)
+                    {
+                        // 位於選中項【上方】：向上平滑推開 +PUSH_OFFSET，絕對不被覆蓋
+                        targetScale = 1.0f;
+                        targetPos = new Vector2(item.basePos.x, item.basePos.y + PUSH_OFFSET);
+                    }
+                    else if (item.column == currentCol && item.row > currentRow)
+                    {
+                        // 位於選中項【下方】：向下平滑推開 -PUSH_OFFSET，絕對不被覆蓋
+                        targetScale = 1.0f;
+                        targetPos = new Vector2(item.basePos.x, item.basePos.y - PUSH_OFFSET);
+                    }
                 }
             }
 

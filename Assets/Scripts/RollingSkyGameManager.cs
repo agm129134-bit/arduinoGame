@@ -706,6 +706,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
     public void SwitchInGameSettingsTab(int tabIndex)
     {
+        currentInGameSettingsTab = tabIndex;
         if (inGameDisplayPanel != null) inGameDisplayPanel.SetActive(tabIndex == 0);
         if (inGameKeyboardPanel != null) inGameKeyboardPanel.SetActive(tabIndex == 1);
         if (inGameControllerPanel != null) inGameControllerPanel.SetActive(tabIndex == 2);
@@ -718,6 +719,8 @@ public class RollingSkyGameManager : MonoBehaviour
         if (tabKeyboardBtn != null) SetInGameBtnColor(tabKeyboardBtn, tabIndex == 1 ? activeCol : normalCol);
         if (tabControllerBtn != null) SetInGameBtnColor(tabControllerBtn, tabIndex == 2 ? activeCol : normalCol);
         if (tabAudioBtn != null) SetInGameBtnColor(tabAudioBtn, tabIndex == 3 ? activeCol : normalCol);
+
+        RebuildInGameSettingsButtons(tabIndex);
     }
 
     void SetInGameBtnColor(Button btn, Color c)
@@ -952,7 +955,6 @@ public class RollingSkyGameManager : MonoBehaviour
             if (sliderSfxVolume != null) sliderSfxVolume.value = PlayerPrefs.GetFloat("SFX_Volume", 0.5f);
 
             SwitchInGameSettingsTab(0);
-            InitInGameSettingsButtons();
             activeInGameNavCol = 0;
             activeInGameNavRow = 0;
             isInGameNavActive = true;
@@ -1686,7 +1688,8 @@ public class RollingSkyGameManager : MonoBehaviour
     private List<InGameAccordionButton> pauseMenuButtons = new List<InGameAccordionButton>();
     private List<InGameAccordionButton> gameOverMenuButtons = new List<InGameAccordionButton>();
     private List<InGameAccordionButton> victoryMenuButtons = new List<InGameAccordionButton>();
-    private List<InGameAccordionButton> inGameSettingsTabButtons = new List<InGameAccordionButton>();
+    private List<InGameAccordionButton> inGameSettingsButtons = new List<InGameAccordionButton>();
+    private int currentInGameSettingsTab = 0;
 
     private int activeInGameNavCol = 0;
     private int activeInGameNavRow = 0;
@@ -1761,24 +1764,59 @@ public class RollingSkyGameManager : MonoBehaviour
         }
     }
 
-    void InitInGameSettingsButtons()
+    void RebuildInGameSettingsButtons(int tabIndex)
     {
+        currentInGameSettingsTab = tabIndex;
         if (inGameSettingsPanel == null) return;
-        inGameSettingsTabButtons.Clear();
+        inGameSettingsButtons.Clear();
+
+        // Row 0: 頂部 4 大分頁 Tab 按鈕
         string[] tabNames = new string[] { "Btn_TabDisplay", "Btn_TabKeyboard", "Btn_TabController", "Btn_TabAudio" };
-        for (int c = 0; c < tabNames.Length; c++)
+        for (int i = 0; i < tabNames.Length; i++)
         {
-            RegisterInGameAccordionButton(inGameSettingsPanel, tabNames[c], c, 0, inGameSettingsTabButtons, (col, row) => {
-                activeInGameNavCol = col;
-                activeInGameNavRow = 0;
+            RegisterInGameAccordionButton(inGameSettingsPanel, tabNames[i], i, 0, inGameSettingsButtons, (c, r) => {
+                activeInGameNavCol = c;
+                activeInGameNavRow = r;
                 isInGameNavActive = true;
             });
         }
-        RegisterInGameAccordionButton(inGameSettingsPanel, "Btn_BackFromSettings", 0, 1, inGameSettingsTabButtons, (col, row) => {
-            activeInGameNavCol = 0;
-            activeInGameNavRow = 1;
-            isInGameNavActive = true;
-        });
+
+        // Row 1~4: 依據當前 Tab 註冊內部選項按鈕
+        if (tabIndex == 0 && inGameDisplayPanel != null)
+        {
+            // Row 1: 全螢幕 / 視窗化
+            RegisterInGameAccordionButton(inGameDisplayPanel, "Btn_Fullscreen", 0, 1, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameDisplayPanel, "Btn_Windowed", 1, 1, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+
+            // Row 2: 4 大快捷解析度
+            RegisterInGameAccordionButton(inGameDisplayPanel, "Btn_Res1080", 0, 2, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameDisplayPanel, "Btn_Res900", 1, 2, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameDisplayPanel, "Btn_Res768", 2, 2, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameDisplayPanel, "Btn_Res720", 3, 2, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+        }
+        else if (tabIndex == 1 && inGameKeyboardPanel != null)
+        {
+            // Row 1~3: 改鍵按鈕
+            RegisterInGameAccordionButton(inGameKeyboardPanel, "Btn_KeyLeft", 0, 1, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameKeyboardPanel, "Btn_KeyRight", 0, 2, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameKeyboardPanel, "Btn_KeyJump", 0, 3, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+        }
+        else if (tabIndex == 3 && inGameAudioPanel != null)
+        {
+            // Row 1: 3 款 BGM 曲目
+            RegisterInGameAccordionButton(inGameAudioPanel, "Btn_Track0", 0, 1, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameAudioPanel, "Btn_Track1", 1, 1, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameAudioPanel, "Btn_Track2", 2, 1, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+
+            // Row 2: 測試音效
+            RegisterInGameAccordionButton(inGameAudioPanel, "Btn_TestSfx", 0, 2, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+        }
+
+        // Row 5: 底部操作按鈕
+        RegisterInGameAccordionButton(inGameSettingsPanel, "Btn_ResetDefaults", 0, 5, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+        RegisterInGameAccordionButton(inGameSettingsPanel, "Btn_BackFromSettings", 1, 5, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+
+        EnsurePanelTextsSafe(inGameSettingsPanel);
     }
 
     void RegisterInGameAccordionButton(GameObject panel, string btnName, int col, int row, List<InGameAccordionButton> list, System.Action<int, int> onHover)
@@ -1862,23 +1900,23 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (inGameSettingsPanel != null && inGameSettingsPanel.activeSelf)
         {
-            UpdateInGameGroupAccordion(inGameSettingsTabButtons, activeInGameNavCol, activeInGameNavRow, dt);
+            UpdateInGameGroupAccordion(inGameSettingsButtons, activeInGameNavCol, activeInGameNavRow, dt, allowPush: false);
         }
         else if (pausePanel != null && pausePanel.activeSelf)
         {
-            UpdateInGameGroupAccordion(pauseMenuButtons, activeInGameNavCol, activeInGameNavRow, dt);
+            UpdateInGameGroupAccordion(pauseMenuButtons, activeInGameNavCol, activeInGameNavRow, dt, allowPush: true);
         }
         else if (gameOverPanel != null && gameOverPanel.activeSelf)
         {
-            UpdateInGameGroupAccordion(gameOverMenuButtons, activeInGameNavCol, activeInGameNavRow, dt);
+            UpdateInGameGroupAccordion(gameOverMenuButtons, activeInGameNavCol, activeInGameNavRow, dt, allowPush: true);
         }
         else if (victoryPanel != null && victoryPanel.activeSelf)
         {
-            UpdateInGameGroupAccordion(victoryMenuButtons, activeInGameNavCol, activeInGameNavRow, dt);
+            UpdateInGameGroupAccordion(victoryMenuButtons, activeInGameNavCol, activeInGameNavRow, dt, allowPush: true);
         }
     }
 
-    void UpdateInGameGroupAccordion(List<InGameAccordionButton> buttonList, int currentCol, int currentRow, float dt)
+    void UpdateInGameGroupAccordion(List<InGameAccordionButton> buttonList, int currentCol, int currentRow, float dt, bool allowPush = true)
     {
         for (int i = 0; i < buttonList.Count; i++)
         {
@@ -1890,24 +1928,36 @@ public class RollingSkyGameManager : MonoBehaviour
             Color targetColor = item.normalColor;
             Color targetTextColor = item.normalTextColor;
 
-            if (isInGameNavActive && (item.column == currentCol || item.row == currentRow))
+            if (isInGameNavActive)
             {
-                if (item.row == currentRow && (item.column == currentCol || buttonList.Count <= 4))
+                if (item.row == currentRow && item.column == currentCol)
                 {
-                    targetScale = SELECTED_SCALE;
+                    // 當前選中按鈕：
+                    // 設定選單 (allowPush == false)：採用優雅就地高光微縮放 1.07x，保持多欄對齊不移位
+                    // 一般選單 (allowPush == true)：居中放大 1.15x，發光高亮
+                    targetScale = allowPush ? SELECTED_SCALE : 1.07f;
                     targetColor = item.highlightColor;
                     targetTextColor = item.highlightTextColor;
                     targetPos = item.basePos;
                 }
-                else if (item.row < currentRow)
+                else if (allowPush)
                 {
-                    targetScale = 1.0f;
-                    targetPos = new Vector2(item.basePos.x, item.basePos.y + PUSH_OFFSET);
-                }
-                else if (item.row > currentRow)
-                {
-                    targetScale = 1.0f;
-                    targetPos = new Vector2(item.basePos.x, item.basePos.y - PUSH_OFFSET);
+                    if (item.row == currentRow && item.column != currentCol)
+                    {
+                        // 同一行左右相鄰按鈕：向左右推開 16px 避免重疊
+                        float sign = (item.column > currentCol) ? 1f : -1f;
+                        targetPos = new Vector2(item.basePos.x + sign * 16f, item.basePos.y);
+                    }
+                    else if (item.row < currentRow)
+                    {
+                        targetScale = 1.0f;
+                        targetPos = new Vector2(item.basePos.x, item.basePos.y + PUSH_OFFSET);
+                    }
+                    else if (item.row > currentRow)
+                    {
+                        targetScale = 1.0f;
+                        targetPos = new Vector2(item.basePos.x, item.basePos.y - PUSH_OFFSET);
+                    }
                 }
             }
 
@@ -1974,41 +2024,7 @@ public class RollingSkyGameManager : MonoBehaviour
         // 3. 各面板導航分發
         if (inGameSettingsPanel != null && inGameSettingsPanel.activeSelf)
         {
-            if (inGameNavCooldownTimer <= 0f)
-            {
-                if (moveLeft && activeInGameNavCol > 0 && activeInGameNavRow == 0)
-                {
-                    activeInGameNavCol--;
-                    SwitchInGameSettingsTab(activeInGameNavCol);
-                    inGameNavCooldownTimer = 0.22f;
-                    isInGameNavActive = true;
-                }
-                else if (moveRight && activeInGameNavCol < 3 && activeInGameNavRow == 0)
-                {
-                    activeInGameNavCol++;
-                    SwitchInGameSettingsTab(activeInGameNavCol);
-                    inGameNavCooldownTimer = 0.22f;
-                    isInGameNavActive = true;
-                }
-                else if (moveDown && activeInGameNavRow == 0)
-                {
-                    activeInGameNavRow = 1; // 切換至返回按鈕
-                    activeInGameNavCol = 0;
-                    inGameNavCooldownTimer = 0.22f;
-                    isInGameNavActive = true;
-                }
-                else if (moveUp && activeInGameNavRow == 1)
-                {
-                    activeInGameNavRow = 0; // 回到頂部 Tab
-                    inGameNavCooldownTimer = 0.22f;
-                    isInGameNavActive = true;
-                }
-            }
-
-            if (confirm)
-            {
-                TriggerSelectedInGameButton(inGameSettingsTabButtons, activeInGameNavCol, activeInGameNavRow);
-            }
+            HandleInGameSettingsNavigation(moveUp, moveDown, moveLeft, moveRight, confirm);
         }
         else if (pausePanel != null && pausePanel.activeSelf)
         {
@@ -2049,6 +2065,106 @@ public class RollingSkyGameManager : MonoBehaviour
         if (confirm)
         {
             TriggerSelectedInGameButton(group, activeInGameNavCol, activeInGameNavRow);
+        }
+    }
+
+    void HandleInGameSettingsNavigation(bool moveUp, bool moveDown, bool moveLeft, bool moveRight, bool confirm)
+    {
+        if (inGameSettingsButtons == null || inGameSettingsButtons.Count == 0) return;
+
+        if (inGameNavCooldownTimer <= 0f)
+        {
+            if (moveUp)
+            {
+                int targetRow = activeInGameNavRow - 1;
+                while (targetRow >= 0 && !inGameSettingsButtons.Exists(b => b.row == targetRow))
+                {
+                    targetRow--;
+                }
+                if (targetRow < 0) targetRow = 5; // 循環到底部按鈕
+                activeInGameNavRow = targetRow;
+
+                var inRow = inGameSettingsButtons.FindAll(b => b.row == activeInGameNavRow);
+                if (inRow.Count > 0 && !inRow.Exists(b => b.column == activeInGameNavCol))
+                {
+                    activeInGameNavCol = inRow[0].column;
+                }
+                inGameNavCooldownTimer = 0.22f;
+                isInGameNavActive = true;
+            }
+            else if (moveDown)
+            {
+                int targetRow = activeInGameNavRow + 1;
+                while (targetRow <= 5 && !inGameSettingsButtons.Exists(b => b.row == targetRow))
+                {
+                    targetRow++;
+                }
+                if (targetRow > 5) targetRow = 0; // 循環回頂部 Tab
+                activeInGameNavRow = targetRow;
+
+                var inRow = inGameSettingsButtons.FindAll(b => b.row == activeInGameNavRow);
+                if (inRow.Count > 0 && !inRow.Exists(b => b.column == activeInGameNavCol))
+                {
+                    activeInGameNavCol = inRow[0].column;
+                }
+                inGameNavCooldownTimer = 0.22f;
+                isInGameNavActive = true;
+            }
+            else if (moveLeft)
+            {
+                if (activeInGameNavRow == 0)
+                {
+                    if (activeInGameNavCol > 0)
+                    {
+                        activeInGameNavCol--;
+                        SwitchInGameSettingsTab(activeInGameNavCol);
+                        inGameNavCooldownTimer = 0.22f;
+                        isInGameNavActive = true;
+                    }
+                }
+                else
+                {
+                    var inRow = inGameSettingsButtons.FindAll(b => b.row == activeInGameNavRow);
+                    inRow.Sort((a, b) => a.column.CompareTo(b.column));
+                    int curIdx = inRow.FindIndex(b => b.column == activeInGameNavCol);
+                    if (curIdx > 0)
+                    {
+                        activeInGameNavCol = inRow[curIdx - 1].column;
+                        inGameNavCooldownTimer = 0.22f;
+                        isInGameNavActive = true;
+                    }
+                }
+            }
+            else if (moveRight)
+            {
+                if (activeInGameNavRow == 0)
+                {
+                    if (activeInGameNavCol < 3)
+                    {
+                        activeInGameNavCol++;
+                        SwitchInGameSettingsTab(activeInGameNavCol);
+                        inGameNavCooldownTimer = 0.22f;
+                        isInGameNavActive = true;
+                    }
+                }
+                else
+                {
+                    var inRow = inGameSettingsButtons.FindAll(b => b.row == activeInGameNavRow);
+                    inRow.Sort((a, b) => a.column.CompareTo(b.column));
+                    int curIdx = inRow.FindIndex(b => b.column == activeInGameNavCol);
+                    if (curIdx >= 0 && curIdx < inRow.Count - 1)
+                    {
+                        activeInGameNavCol = inRow[curIdx + 1].column;
+                        inGameNavCooldownTimer = 0.22f;
+                        isInGameNavActive = true;
+                    }
+                }
+            }
+        }
+
+        if (confirm)
+        {
+            TriggerSelectedInGameButton(inGameSettingsButtons, activeInGameNavCol, activeInGameNavRow);
         }
     }
 
