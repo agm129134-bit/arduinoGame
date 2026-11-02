@@ -121,8 +121,30 @@ public class SkyTowerMapGenerator : MonoBehaviour
         // 起點主平臺 (16x16m, Y = 0)
         CreatePlatform(new Vector3(0, 0, 0), new Vector3(16f, 2.0f, 16f), matGround, hub.transform, "StartPlatform");
 
-        // 墜落保護大地板 (150x150m, Y = -0.8m)
-        CreatePlatform(new Vector3(0, -0.8f, 0), new Vector3(150f, 1.0f, 150f), matGround, hub.transform, "GroundCatcherFloor");
+        // 全域前向延伸墜落保護大地板 (涵蓋全塔 X:-120~+140m, Z:-80~+380m, Y = -0.8m)
+        // 徹底解決小球前行攀爬至 Zone 2~Zone 6 時下方無地板、直接墜出地圖外的問題！
+        Vector3 groundCenter = new Vector3(10f, -0.8f, 150f);
+        Vector3 groundSize = new Vector3(260f, 1.0f, 460f);
+        CreatePlatform(groundCenter, groundSize, matGround, hub.transform, "GroundCatcherFloor");
+
+        // 四方高聳防墜邊界光柱與邊界防護標記 (Corner & Perimeter Beacon Pillars)
+        float halfW = groundSize.x * 0.5f - 4f; // 126m
+        float halfL = groundSize.z * 0.5f - 4f; // 226m
+        Vector3[] beaconPositions = new Vector3[]
+        {
+            groundCenter + new Vector3(-halfW, 10f, -halfL),
+            groundCenter + new Vector3(halfW, 10f, -halfL),
+            groundCenter + new Vector3(-halfW, 10f, halfL),
+            groundCenter + new Vector3(halfW, 10f, halfL),
+            groundCenter + new Vector3(-halfW, 10f, 0f),
+            groundCenter + new Vector3(halfW, 10f, 0f),
+            groundCenter + new Vector3(0f, 10f, halfL),
+            groundCenter + new Vector3(0f, 10f, -halfL)
+        };
+        for (int b = 0; b < beaconPositions.Length; b++)
+        {
+            CreatePillar(beaconPositions[b], 1.2f, 20f, matZone1_Dawn, hub.transform, $"GroundBeacon_{b}");
+        }
 
         // 起點裝飾光柱
         CreatePillar(new Vector3(-7f, 3.5f, -7f), 0.5f, 7f, matZone1_Dawn, hub.transform);

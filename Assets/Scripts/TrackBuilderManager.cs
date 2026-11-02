@@ -3,6 +3,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.EventSystems;
 
 public class TrackBuilderManager : MonoBehaviour
 {
@@ -142,6 +143,8 @@ public class TrackBuilderManager : MonoBehaviour
 
     void Update()
     {
+        UpdateToolbarAccordionLayout();
+
         if (!isEditMode)
         {
             // 測試遊玩中按下 ESC 可隨時重返建造模式；若小球墜落或死亡亦自動返回
@@ -156,7 +159,11 @@ public class TrackBuilderManager : MonoBehaviour
             return;
         }
 
-        HandleInput();
+        HandleToolbarNavigationInput();
+        if (!isToolbarNavActive)
+        {
+            HandleInput();
+        }
         UpdateCursorTransform();
     }
 
@@ -556,10 +563,209 @@ public class TrackBuilderManager : MonoBehaviour
         t.color = Color.white;
         t.alignment = TextAnchor.MiddleCenter;
         t.text = label;
+        t.horizontalOverflow = HorizontalWrapMode.Overflow;
+        t.verticalOverflow = VerticalWrapMode.Overflow;
+
         RectTransform trt = txtObj.GetComponent<RectTransform>();
         trt.anchorMin = Vector2.zero;
         trt.anchorMax = Vector2.one;
         trt.sizeDelta = Vector2.zero;
+
+        Outline outline = txtObj.AddComponent<Outline>();
+        outline.effectColor = new Color(0, 0, 0, 0.9f);
+        outline.effectDistance = new Vector2(2, -2);
+
+        int idx = toolbarButtons.Count;
+        RegisterToolbarAccordionButton(btn, rt, img, t, pos, idx);
+    }
+
+    // ==================== 自訂關卡工具列 Accordion 動態推擠與焦點控制系統 ====================
+    [System.Serializable]
+    public class BuilderAccordionButton
+    {
+        public Button button;
+        public RectTransform rectTransform;
+        public Image image;
+        public Text text;
+        public Vector2 basePos;
+        public int index;
+        public Color normalColor = new Color(0.12f, 0.2f, 0.35f, 0.95f);
+        public Color highlightColor = new Color(0.95f, 0.65f, 0.05f, 1f);
+        public Color normalTextColor = Color.white;
+        public Color highlightTextColor = new Color(1f, 1f, 0.85f, 1f);
+    }
+
+    private List<BuilderAccordionButton> toolbarButtons = new List<BuilderAccordionButton>();
+    private int activeToolbarIndex = -1;
+    private bool isToolbarNavActive = false;
+    private float toolbarCooldownTimer = 0f;
+    private bool lastJoyBtnState = false;
+    private ArduinoReceiver arduino;
+
+    private const float TOOLBAR_SCALE = 1.15f;
+    private const float TOOLBAR_PUSH_X = 20f;
+    private const float TOOLBAR_ANIM_SPEED = 14f;
+
+    void RegisterToolbarAccordionButton(Button btn, RectTransform rt, Image img, Text txt, Vector2 basePos, int idx)
+    {
+        BuilderAccordionButton item = new BuilderAccordionButton
+        {
+            button = btn,
+            rectTransform = rt,
+            image = img,
+            text = txt,
+            basePos = basePos,
+            index = idx
+        };
+
+        EventTrigger trigger = btn.gameObject.GetComponent<EventTrigger>();
+        if (trigger == null) trigger = btn.gameObject.AddComponent<EventTrigger>();
+        trigger.triggers.Clear();
+
+        EventTrigger.Entry enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+        int captured = idx;
+        enter.callback.AddListener((data) => {
+            activeToolbarIndex = captured;
+        });
+        trigger.triggers.Add(enter);
+
+        EventTrigger.Entry exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+        exit.callback.AddListener((data) => {
+            if (!isToolbarNavActive && activeToolbarIndex == captured)
+            {
+                activeToolbarIndex = -1;
+            }
+        });
+        trigger.triggers.Add(exit);
+
+        toolbarButtons.Add(item);
+    }
+
+    void UpdateToolbarAccordionLayout()
+    {
+        float dt = Time.unscaledDeltaTime;
+        for (int i = 0; i < toolbarButtons.Count; i++)
+        {
+            var item = toolbarButtons[i];
+            if (item.rectTransform == null) continue;
+
+            Vector2 targetPos = item.basePos;
+            float targetScale = 1.0f;
+            Color targetColor = item.normalColor;
+            Color targetTextColor = item.normalTextColor;
+
+            if (activeToolbarIndex >= 0)
+            {
+                if (item.index == activeToolbarIndex)
+                {
+                    targetScale = TOOLBAR_SCALE;
+                    targetColor = item.highlightColor;
+                    targetTextColor = item.highlightTextColor;
+                    targetPos = item.basePos;
+                }
+                else if (item.index < activeToolbarIndex)
+                {
+                    // 左側按鈕向左平滑推擠 -20px，徹底避免重疊
+                    targetPos = new Vector2(item.basePos.x - TOOLBAR_PUSH_X, item.basePos.y);
+                }
+                else if (item.index > activeToolbarIndex)
+                {
+                    // 右側按鈕向右平滑推擠 +20px，徹底避免重疊
+                    targetPos = new Vector2(item.basePos.x + TOOLBAR_PUSH_X, item.basePos.y);
+                }
+            }
+
+            item.rectTransform.anchoredPosition = Vector2.Lerp(item.rectTransform.anchoredPosition, targetPos, dt * TOOLBAR_ANIM_SPEED);
+            item.rectTransform.localScale = Vector3.Lerp(item.rectTransform.localScale, new Vector3(targetScale, targetScale, 1f), dt * TOOLBAR_ANIM_SPEED);
+
+            if (item.image != null)
+                item.image.color = Color.Lerp(item.image.color, targetColor, dt * TOOLBAR_ANIM_SPEED);
+            if (item.text != null)
+                item.text.color = Color.Lerp(item.text.color, targetTextColor, dt * TOOLBAR_ANIM_SPEED);
+        }
+    }
+
+    void HandleToolbarNavigationInput()
+    {
+        if (toolbarCooldownTimer > 0f) toolbarCooldownTimer -= Time.unscaledDeltaTime;
+
+        // Tab 鍵切換賽道編輯與頂部工具列焦點
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            isToolbarNavActive = !isToolbarNavActive;
+            if (isToolbarNavActive && activeToolbarIndex < 0) activeToolbarIndex = 0;
+            else if (!isToolbarNavActive) activeToolbarIndex = -1;
+            toolbarCooldownTimer = 0.2f;
+        }
+
+        // Arduino 實體搖桿操作
+        if (arduino == null) arduino = FindAnyObjectByType<ArduinoReceiver>();
+        if (arduino != null)
+        {
+            float joyX = arduino.joystick.x;
+            bool joyBtn = arduino.isButtonPressed;
+
+            if (isToolbarNavActive && joyBtn && !lastJoyBtnState)
+            {
+                TriggerToolbarButton(activeToolbarIndex);
+            }
+            lastJoyBtnState = joyBtn;
+
+            if (isToolbarNavActive && toolbarCooldownTimer <= 0f)
+            {
+                if (joyX < 320f && activeToolbarIndex > 0)
+                {
+                    activeToolbarIndex--;
+                    toolbarCooldownTimer = 0.22f;
+                }
+                else if (joyX > 680f && activeToolbarIndex < toolbarButtons.Count - 1)
+                {
+                    activeToolbarIndex++;
+                    toolbarCooldownTimer = 0.22f;
+                }
+            }
+        }
+
+        if (isToolbarNavActive)
+        {
+            if (toolbarCooldownTimer <= 0f)
+            {
+                if ((Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A)) && activeToolbarIndex > 0)
+                {
+                    activeToolbarIndex--;
+                    toolbarCooldownTimer = 0.22f;
+                }
+                else if ((Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D)) && activeToolbarIndex < toolbarButtons.Count - 1)
+                {
+                    activeToolbarIndex++;
+                    toolbarCooldownTimer = 0.22f;
+                }
+                else if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.Escape))
+                {
+                    isToolbarNavActive = false;
+                    activeToolbarIndex = -1;
+                    toolbarCooldownTimer = 0.2f;
+                }
+            }
+
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                TriggerToolbarButton(activeToolbarIndex);
+            }
+        }
+    }
+
+    void TriggerToolbarButton(int idx)
+    {
+        if (idx >= 0 && idx < toolbarButtons.Count)
+        {
+            var btn = toolbarButtons[idx].button;
+            if (btn != null && btn.interactable)
+            {
+                btn.onClick.Invoke();
+                toolbarCooldownTimer = 0.28f;
+            }
+        }
     }
 
     void ClearGrid()

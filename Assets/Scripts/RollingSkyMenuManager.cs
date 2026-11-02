@@ -1228,6 +1228,8 @@ public class RollingSkyMenuManager : MonoBehaviour
         {
             UpdateDisplayUI();
         }
+
+        RebuildSettingsAccordionButtons(tabIndex);
     }
 
     // ==================== 音訊設定控制 ====================
@@ -1835,7 +1837,8 @@ public class RollingSkyMenuManager : MonoBehaviour
     private List<MenuAccordionButton> mainMenuButtons = new List<MenuAccordionButton>();
     private List<MenuAccordionButton> levelSelectButtons = new List<MenuAccordionButton>();
     private List<MenuAccordionButton> shopButtons = new List<MenuAccordionButton>();
-    private List<MenuAccordionButton> settingsTabButtons = new List<MenuAccordionButton>();
+    private List<MenuAccordionButton> activeSettingsButtons = new List<MenuAccordionButton>();
+    private int currentSettingsTab = 0;
 
     private int activeNavCol = 0; // 0: 左欄, 1: 右欄
     private int activeNavRow = 0; // 縱向索引
@@ -1886,17 +1889,73 @@ public class RollingSkyMenuManager : MonoBehaviour
             RegisterAccordionButton(shopPanel, "Btn_ShopBack", 0, 5, shopButtons, (c, row) => { activeNavCol = 0; activeNavRow = 5; isMenuNavActive = true; });
         }
 
-        // 4. 初始化系統設定 Tab 分頁按鈕
+        // 4. 初始化系統設定選項按鈕 (頂部 4 大 Tab + 內部調整選項 + 底部三大按鈕)
         if (settingsPanel != null)
         {
-            settingsTabButtons.Clear();
-            string[] tabNames = new string[] { "Btn_TabDisplay", "Btn_TabKeyboard", "Btn_TabController", "Btn_TabAudio" };
-            for (int i = 0; i < tabNames.Length; i++)
-                RegisterAccordionButton(settingsPanel, tabNames[i], i, 0, settingsTabButtons, (c, row) => { activeNavCol = c; activeNavRow = 0; isMenuNavActive = true; });
-            RegisterAccordionButton(settingsPanel, "Btn_Back", 0, 1, settingsTabButtons, (c, row) => { activeNavCol = 0; activeNavRow = 1; isMenuNavActive = true; });
+            RebuildSettingsAccordionButtons(0);
         }
 
         // 全域文字防切除防線生效
+        EnsureAllButtonsTextSafe();
+    }
+
+    void RebuildSettingsAccordionButtons(int tabIndex)
+    {
+        currentSettingsTab = tabIndex;
+        activeSettingsButtons.Clear();
+        if (settingsPanel == null) return;
+
+        // Row 0: 頂部 4 大分頁 Tab 按鈕
+        string[] tabNames = new string[] { "Btn_TabDisplay", "Btn_TabKeyboard", "Btn_TabController", "Btn_TabAudio" };
+        for (int i = 0; i < tabNames.Length; i++)
+        {
+            RegisterAccordionButton(settingsPanel, tabNames[i], i, 0, activeSettingsButtons, (c, r) => {
+                activeNavCol = c; activeNavRow = r; isMenuNavActive = true;
+            });
+        }
+
+        // Row 1~4: 依據當前 Tab 註冊內部選項按鈕
+        if (tabIndex == 0 && displaySettingsPanel != null)
+        {
+            // Row 1: 全螢幕 / 視窗化
+            RegisterAccordionButton(displaySettingsPanel, "Btn_Fullscreen", 0, 1, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+            RegisterAccordionButton(displaySettingsPanel, "Btn_Windowed", 1, 1, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+
+            // Row 2: 解析度前後翻頁
+            RegisterAccordionButton(displaySettingsPanel, "Btn_ResPrev", 0, 2, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+            RegisterAccordionButton(displaySettingsPanel, "Btn_ResNext", 1, 2, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+
+            // Row 3: 4 大快捷解析度
+            RegisterAccordionButton(displaySettingsPanel, "Btn_Res1080", 0, 3, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+            RegisterAccordionButton(displaySettingsPanel, "Btn_Res900", 1, 3, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+            RegisterAccordionButton(displaySettingsPanel, "Btn_Res768", 2, 3, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+            RegisterAccordionButton(displaySettingsPanel, "Btn_Res720", 3, 3, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+
+            // Row 4: 套用解析度
+            RegisterAccordionButton(displaySettingsPanel, "Btn_ApplyRes", 0, 4, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+        }
+        else if (tabIndex == 1 && keyboardSettingsPanel != null)
+        {
+            RegisterAccordionButton(keyboardSettingsPanel, "Btn_KeyLeft", 0, 1, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+            RegisterAccordionButton(keyboardSettingsPanel, "Btn_KeyRight", 0, 2, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+            RegisterAccordionButton(keyboardSettingsPanel, "Btn_KeyJump", 0, 3, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+        }
+        else if (tabIndex == 3 && audioSettingsPanel != null)
+        {
+            // Row 1: 3 款 BGM 曲目
+            RegisterAccordionButton(audioSettingsPanel, "Btn_BgmTrack0", 0, 1, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+            RegisterAccordionButton(audioSettingsPanel, "Btn_BgmTrack1", 1, 1, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+            RegisterAccordionButton(audioSettingsPanel, "Btn_BgmTrack2", 2, 1, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+
+            // Row 2: 測試音效
+            RegisterAccordionButton(audioSettingsPanel, "Btn_TestSfx", 0, 2, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+        }
+
+        // Row 5: 底部三大全局按鈕
+        RegisterAccordionButton(settingsPanel, "Btn_ResetDefaults", 0, 5, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+        RegisterAccordionButton(settingsPanel, "Btn_ResetAllSave", 1, 5, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+        RegisterAccordionButton(settingsPanel, "Btn_SaveBack", 2, 5, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+
         EnsureAllButtonsTextSafe();
     }
 
@@ -1984,7 +2043,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         }
         else if (settingsPanel != null && settingsPanel.activeInHierarchy)
         {
-            UpdateGroupAccordion(settingsTabButtons, activeNavCol, activeNavRow, dt);
+            UpdateGroupAccordion(activeSettingsButtons, activeNavCol, activeNavRow, dt);
         }
     }
 
@@ -2000,10 +2059,9 @@ public class RollingSkyMenuManager : MonoBehaviour
             Color targetColor = item.normalColor;
             Color targetTextColor = item.normalTextColor;
 
-            // 只有同欄或同一操作流的按鈕參與垂直推擠
-            if (isMenuNavActive && item.column == currentCol)
+            if (isMenuNavActive)
             {
-                if (item.row == currentRow)
+                if (item.row == currentRow && item.column == currentCol)
                 {
                     // 當前選中按鈕：居中放大 1.15x，發光高亮
                     targetScale = SELECTED_SCALE;
@@ -2011,13 +2069,19 @@ public class RollingSkyMenuManager : MonoBehaviour
                     targetTextColor = item.highlightTextColor;
                     targetPos = item.basePos;
                 }
-                else if (item.row < currentRow)
+                else if (item.row == currentRow && item.column != currentCol)
+                {
+                    // 同一行左右相鄰按鈕：向左右推開 16px 避免重疊
+                    float sign = (item.column > currentCol) ? 1f : -1f;
+                    targetPos = new Vector2(item.basePos.x + sign * 16f, item.basePos.y);
+                }
+                else if (item.column == currentCol && item.row < currentRow)
                 {
                     // 位於選中項【上方】：向上平滑推開 +PUSH_OFFSET，絕對不被覆蓋
                     targetScale = 1.0f;
                     targetPos = new Vector2(item.basePos.x, item.basePos.y + PUSH_OFFSET);
                 }
-                else if (item.row > currentRow)
+                else if (item.column == currentCol && item.row > currentRow)
                 {
                     // 位於選中項【下方】：向下平滑推開 -PUSH_OFFSET，絕對不被覆蓋
                     targetScale = 1.0f;
@@ -2097,37 +2161,105 @@ public class RollingSkyMenuManager : MonoBehaviour
         }
         else if (settingsPanel != null && settingsPanel.activeInHierarchy)
         {
-            if (navCooldownTimer <= 0f)
-            {
-                // 設定面板支援左右撥動直接切換 4 大 Tab 分頁！
-                if (moveLeft && activeNavCol > 0)
-                {
-                    activeNavCol--;
-                    SwitchSettingsTab(activeNavCol);
-                    navCooldownTimer = 0.22f;
-                }
-                else if (moveRight && activeNavCol < 3)
-                {
-                    activeNavCol++;
-                    SwitchSettingsTab(activeNavCol);
-                    navCooldownTimer = 0.22f;
-                }
-                else if (moveDown && activeNavRow == 0)
-                {
-                    activeNavRow = 1; // 切換至底部返回鍵
-                    navCooldownTimer = 0.22f;
-                }
-                else if (moveUp && activeNavRow == 1)
-                {
-                    activeNavRow = 0; // 回到頂部 Tab
-                    navCooldownTimer = 0.22f;
-                }
-            }
+            HandleSettingsPanelNavigation(moveUp, moveDown, moveLeft, moveRight, confirm);
+        }
+    }
 
-            if (confirm)
+    void HandleSettingsPanelNavigation(bool moveUp, bool moveDown, bool moveLeft, bool moveRight, bool confirm)
+    {
+        if (navCooldownTimer <= 0f)
+        {
+            if (moveUp)
             {
-                TriggerSelectedButtonInGroup(settingsTabButtons, activeNavCol, activeNavRow);
+                int targetRow = activeNavRow - 1;
+                while (targetRow >= 0 && !activeSettingsButtons.Exists(b => b.row == targetRow))
+                {
+                    targetRow--;
+                }
+                if (targetRow < 0) targetRow = 5; // 循環到底部三大按鈕
+                activeNavRow = targetRow;
+
+                var inRow = activeSettingsButtons.FindAll(b => b.row == activeNavRow);
+                if (inRow.Count > 0 && !inRow.Exists(b => b.column == activeNavCol))
+                {
+                    activeNavCol = inRow[0].column;
+                }
+                navCooldownTimer = 0.22f;
+                isMenuNavActive = true;
             }
+            else if (moveDown)
+            {
+                int targetRow = activeNavRow + 1;
+                while (targetRow <= 5 && !activeSettingsButtons.Exists(b => b.row == targetRow))
+                {
+                    targetRow++;
+                }
+                if (targetRow > 5) targetRow = 0; // 循環回頂部 Tab
+                activeNavRow = targetRow;
+
+                var inRow = activeSettingsButtons.FindAll(b => b.row == activeNavRow);
+                if (inRow.Count > 0 && !inRow.Exists(b => b.column == activeNavCol))
+                {
+                    activeNavCol = inRow[0].column;
+                }
+                navCooldownTimer = 0.22f;
+                isMenuNavActive = true;
+            }
+            else if (moveLeft)
+            {
+                if (activeNavRow == 0)
+                {
+                    if (activeNavCol > 0)
+                    {
+                        activeNavCol--;
+                        SwitchSettingsTab(activeNavCol);
+                        navCooldownTimer = 0.22f;
+                        isMenuNavActive = true;
+                    }
+                }
+                else
+                {
+                    var inRow = activeSettingsButtons.FindAll(b => b.row == activeNavRow);
+                    inRow.Sort((a, b) => a.column.CompareTo(b.column));
+                    int curIdx = inRow.FindIndex(b => b.column == activeNavCol);
+                    if (curIdx > 0)
+                    {
+                        activeNavCol = inRow[curIdx - 1].column;
+                        navCooldownTimer = 0.22f;
+                        isMenuNavActive = true;
+                    }
+                }
+            }
+            else if (moveRight)
+            {
+                if (activeNavRow == 0)
+                {
+                    if (activeNavCol < 3)
+                    {
+                        activeNavCol++;
+                        SwitchSettingsTab(activeNavCol);
+                        navCooldownTimer = 0.22f;
+                        isMenuNavActive = true;
+                    }
+                }
+                else
+                {
+                    var inRow = activeSettingsButtons.FindAll(b => b.row == activeNavRow);
+                    inRow.Sort((a, b) => a.column.CompareTo(b.column));
+                    int curIdx = inRow.FindIndex(b => b.column == activeNavCol);
+                    if (curIdx >= 0 && curIdx < inRow.Count - 1)
+                    {
+                        activeNavCol = inRow[curIdx + 1].column;
+                        navCooldownTimer = 0.22f;
+                        isMenuNavActive = true;
+                    }
+                }
+            }
+        }
+
+        if (confirm)
+        {
+            TriggerSelectedButtonInGroup(activeSettingsButtons, activeNavCol, activeNavRow);
         }
     }
 
