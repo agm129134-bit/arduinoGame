@@ -531,9 +531,9 @@ public class TrackBuilderManager : MonoBehaviour
 
         // 底部工具列按鈕
         CreateButton(builderUIPanel.transform, "Btn_Play", "▶ 測試遊玩 (PLAY)", new Vector2(-360, 60), new Vector2(220, 55), StartTestPlay, font);
-        CreateButton(builderUIPanel.transform, "Btn_Save", "💾 儲存場地 (SAVE)", new Vector2(-120, 60), new Vector2(220, 55), SaveTrack, font);
-        CreateButton(builderUIPanel.transform, "Btn_Clear", "🗑 清空賽道 (CLEAR)", new Vector2(120, 60), new Vector2(220, 55), ClearGrid, font);
-        CreateButton(builderUIPanel.transform, "Btn_Exit", "🏠 返回選單 (BACK)", new Vector2(360, 60), new Vector2(220, 55), ReturnToMenu, font);
+        CreateButton(builderUIPanel.transform, "Btn_Save", "▣ 儲存場地 (SAVE)", new Vector2(-120, 60), new Vector2(220, 55), SaveTrack, font);
+        CreateButton(builderUIPanel.transform, "Btn_Clear", "✕ 清空賽道 (CLEAR)", new Vector2(120, 60), new Vector2(220, 55), ClearGrid, font);
+        CreateButton(builderUIPanel.transform, "Btn_Exit", "⌂ 返回選單 (BACK)", new Vector2(360, 60), new Vector2(220, 55), ReturnToMenu, font);
 
         UpdateInfoText();
     }

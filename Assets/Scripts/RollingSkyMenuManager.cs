@@ -605,7 +605,7 @@ public class RollingSkyMenuManager : MonoBehaviour
                 int gems = PlayerPrefs.GetInt("TotalGems", 0);
                 int highScore = PlayerPrefs.GetInt("Endless_HighScore", 0);
                 int towerHeight = PlayerPrefs.GetInt("SkyTower_BestHeight", 0);
-                txt.text = $"💎 水晶: <color=cyan>{gems}</color>   |   🏆 無盡最高: <color=yellow>{highScore}</color> 分   |   🗼 天梯最高: <color=lime>{towerHeight}m</color>   |   <color=#AAAAAA>v0.9.9</color>";
+                txt.text = $"◆ 水晶: <color=cyan>{gems}</color>   |   ★ 無盡最高: <color=yellow>{highScore}</color> 分   |   ▲ 天梯最高: <color=lime>{towerHeight}m</color>   |   <color=#AAAAAA>v{Application.version}</color>";
             }
         }
     }
@@ -658,7 +658,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         if (tGems != null)
         {
             Text txt = tGems.GetComponent<Text>();
-            if (txt != null) txt.text = $"💎 目前持有水晶: <color=cyan>{totalGems}</color>";
+            if (txt != null) txt.text = $"◆ 目前持有水晶: <color=cyan>{totalGems}</color>";
         }
 
         int[] skinPrices = new int[] { 0, 20, 40, 70, 100 };
@@ -683,7 +683,7 @@ public class RollingSkyMenuManager : MonoBehaviour
                 }
                 else
                 {
-                    txt.text = $"購買 ({skinPrices[i]} 💎)";
+                    txt.text = $"購買 ({skinPrices[i]} ◆)";
                     txt.color = (totalGems >= skinPrices[i]) ? Color.yellow : Color.gray;
                 }
             }
@@ -1001,8 +1001,8 @@ public class RollingSkyMenuManager : MonoBehaviour
 
         // 1. 全螢幕與視窗化開關
         CreateText(pDisplay.transform, "Lbl_ScreenMode", "顯示模式 (SCREEN MODE):", 26, Color.white, new Vector2(0, 205), new Vector2(800, 40), font, FontStyle.Bold);
-        btnFullscreen = CreateStyledButton(pDisplay.transform, "Btn_Fullscreen", "🖥️ 全螢幕模式 (FULLSCREEN)", new Vector2(-170, 145), new Vector2(320, 60), 22, font);
-        btnWindowed = CreateStyledButton(pDisplay.transform, "Btn_Windowed", "🪟 視窗化模式 (WINDOWED)", new Vector2(170, 145), new Vector2(320, 60), 22, font);
+        btnFullscreen = CreateStyledButton(pDisplay.transform, "Btn_Fullscreen", "▭ 全螢幕模式 (FULLSCREEN)", new Vector2(-170, 145), new Vector2(320, 60), 22, font);
+        btnWindowed = CreateStyledButton(pDisplay.transform, "Btn_Windowed", "▢ 視窗化模式 (WINDOWED)", new Vector2(170, 145), new Vector2(320, 60), 22, font);
 
         // 2. 解析度選擇器
         CreateText(pDisplay.transform, "Lbl_Resolution", "螢幕解析度 (RESOLUTION):", 26, Color.white, new Vector2(0, 65), new Vector2(800, 40), font, FontStyle.Bold);
@@ -1089,7 +1089,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         sliderSfxVolume = CreateSlider(pAudio.transform, "Slider_SfxVolume", new Vector2(100, -120), new Vector2(320, 30), 0f, 1f, 0.5f);
         txtSfxVolume = CreateText(pAudio.transform, "Txt_SfxVolVal", "50%", 26, Color.cyan, new Vector2(320, -120), new Vector2(100, 50), font, FontStyle.Bold);
 
-        btnTestSfx = CreateStyledButton(pAudio.transform, "Btn_TestSfx", "🔊 試聽音效 (TEST SFX)", new Vector2(0, -210), new Vector2(320, 55), 22, font);
+        btnTestSfx = CreateStyledButton(pAudio.transform, "Btn_TestSfx", "♪ 試聽音效 (TEST SFX)", new Vector2(0, -210), new Vector2(320, 55), 22, font);
 
         pAudio.SetActive(false);
         return pAudio;

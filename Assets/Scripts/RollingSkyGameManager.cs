@@ -481,12 +481,12 @@ public class RollingSkyGameManager : MonoBehaviour
         rt.sizeDelta = Vector2.zero;
 
         CreateText(panel.transform, "Title", "遊戲暫停 PAUSED", 56, new Color(0f, 1f, 0.9f), new Vector2(0, 160), new Vector2(800, 80), font, FontStyle.Bold);
-        CreateText(panel.transform, "Hint", "💡 提示：再次按下 [ESC] 鍵可直接繼續遊戲", 24, new Color(0.4f, 0.9f, 1f), new Vector2(0, 105), new Vector2(800, 50), font, FontStyle.Normal);
+        CreateText(panel.transform, "Hint", "• 提示：再次按下 [ESC] 鍵可直接繼續遊戲", 24, new Color(0.4f, 0.9f, 1f), new Vector2(0, 105), new Vector2(800, 50), font, FontStyle.Normal);
 
         CreateStyledButton(panel.transform, "Btn_Resume", "▶ 繼續遊戲 (RESUME)", new Vector2(0, 45), new Vector2(440, 58), 28, font);
         CreateStyledButton(panel.transform, "Btn_Settings", "⚙ 遊戲設定 (SETTINGS)", new Vector2(0, -25), new Vector2(440, 58), 26, font);
-        CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新挑戰 (RESTART)", new Vector2(0, -95), new Vector2(440, 58), 28, font);
-        CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回到主選單 (MAIN MENU)", new Vector2(0, -165), new Vector2(440, 58), 28, font);
+        CreateStyledButton(panel.transform, "Btn_Restart", "重新挑戰 (RESTART)", new Vector2(0, -95), new Vector2(440, 58), 28, font);
+        CreateStyledButton(panel.transform, "Btn_MainMenu", "⌂ 回到主選單 (MAIN MENU)", new Vector2(0, -165), new Vector2(440, 58), 28, font);
 
         return panel;
     }
@@ -588,7 +588,7 @@ public class RollingSkyGameManager : MonoBehaviour
             FindAnyObjectByType<RollingSkyCamera>()?.ReloadSettings();
         });
 
-        CreateText(inGameKeyboardPanel.transform, "Hint_Rebind", "💡 點擊上方按鈕後，按下實體鍵盤任一鍵即可重新綁定", 20, new Color(0.3f, 0.85f, 1f), new Vector2(0, -170), new Vector2(800, 35), font, FontStyle.Normal);
+        CreateText(inGameKeyboardPanel.transform, "Hint_Rebind", "• 點擊上方按鈕後，按下實體鍵盤任一鍵即可重新綁定", 20, new Color(0.3f, 0.85f, 1f), new Vector2(0, -170), new Vector2(800, 35), font, FontStyle.Normal);
 
         // ---------- 分頁 2: 控制器設定 (Controller Panel) ----------
         inGameControllerPanel = CreateSubPanel(panel.transform, "InGameControllerPanel");
@@ -666,7 +666,7 @@ public class RollingSkyGameManager : MonoBehaviour
         txtSfxVolume = CreateText(inGameAudioPanel.transform, "Txt_SfxVal", $"{sliderSfxVolume.value * 100f:F0}%", 24, Color.cyan, new Vector2(230, -55), new Vector2(80, 45), font, FontStyle.Bold);
         sliderSfxVolume.onValueChanged.AddListener(OnInGameSfxChanged);
 
-        GameObject bTest = CreateStyledButton(inGameAudioPanel.transform, "Btn_TestSfx", "🔊 測試音效 (TEST SFX)", new Vector2(0, -135), new Vector2(260, 48), 22, font);
+        GameObject bTest = CreateStyledButton(inGameAudioPanel.transform, "Btn_TestSfx", "♪ 測試音效 (TEST SFX)", new Vector2(0, -135), new Vector2(260, 48), 22, font);
         bTest.GetComponent<Button>().onClick.AddListener(() => AudioManager.Instance?.PlayGem());
 
         // ---------- 底部操作按鈕 ----------
@@ -1098,7 +1098,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (tRestart == null)
         {
-            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -65), new Vector2(440, 60), 28, font);
+            CreateStyledButton(panel.transform, "Btn_Restart", "重新開始 (RETRY)", new Vector2(0, -65), new Vector2(440, 60), 28, font);
         }
         else
         {
@@ -1108,7 +1108,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (tMainMenu == null)
         {
-            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -140), new Vector2(440, 60), 28, font);
+            CreateStyledButton(panel.transform, "Btn_MainMenu", "⌂ 回主選單 (MAIN MENU)", new Vector2(0, -140), new Vector2(440, 60), 28, font);
         }
         else
         {
@@ -1197,7 +1197,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (tRestart == null)
         {
-            CreateStyledButton(panel.transform, "Btn_Restart", "🔄 重新開始 (RETRY)", new Vector2(0, -55), new Vector2(440, 56), 26, font);
+            CreateStyledButton(panel.transform, "Btn_Restart", "重新開始 (RETRY)", new Vector2(0, -55), new Vector2(440, 56), 26, font);
         }
         else
         {
@@ -1207,7 +1207,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (tMainMenu == null)
         {
-            CreateStyledButton(panel.transform, "Btn_MainMenu", "🏠 回主選單 (MAIN MENU)", new Vector2(0, -125), new Vector2(440, 56), 26, font);
+            CreateStyledButton(panel.transform, "Btn_MainMenu", "⌂ 回主選單 (MAIN MENU)", new Vector2(0, -125), new Vector2(440, 56), 26, font);
         }
         else
         {
@@ -1376,7 +1376,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
             if (progressText != null)
             {
-                progressText.text = $"🗼 高度: <color=lime>{currentHeight:F1}m</color> / 500m ({ratio:P0})  {zoneName}  |  🏆 最佳: <color=yellow>{bestHeight}m</color>";
+                progressText.text = $"▲ 高度: <color=lime>{currentHeight:F1}m</color> / 500m ({ratio:P0})  {zoneName}  |  ★ 最佳: <color=yellow>{bestHeight}m</color>";
             }
             if (progressBar != null) progressBar.value = ratio;
             return;
@@ -1406,7 +1406,7 @@ public class RollingSkyGameManager : MonoBehaviour
                 {
                     prt.sizeDelta = new Vector2(850f, 60f);
                 }
-                progressText.text = $"⚡ 得分: {score}  |  🏆 最佳: {bestScore}";
+                progressText.text = $"» 得分: {score}  |  ★ 最佳: {bestScore}";
             }
             if (progressBar != null) progressBar.value = Mathf.PingPong(currentDist / 80f, 1.0f);
         }
@@ -1490,7 +1490,7 @@ public class RollingSkyGameManager : MonoBehaviour
                 }
                 gemText.horizontalOverflow = HorizontalWrapMode.Overflow;
                 gemText.verticalOverflow = VerticalWrapMode.Overflow;
-                gemText.text = $"💎 {collectedGems} / {totalGemsInLevel}";
+                gemText.text = $"◆ {collectedGems} / {totalGemsInLevel}";
             }
         }
     }
