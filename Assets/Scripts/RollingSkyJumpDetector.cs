@@ -27,7 +27,7 @@ public class RollingSkyJumpDetector : MonoBehaviour
 
         // 載入自訂跳躍鍵與超音波跳躍距離
         customKeyJump = (KeyCode)PlayerPrefs.GetInt("Key_Jump", (int)KeyCode.Space);
-        triggerDistance = PlayerPrefs.GetFloat("Ultrasonic_JumpDist", 20.0f);
+        triggerDistance = PlayerPrefs.GetFloat("Jump_Distance", 20.0f); // 與設定選單/球體控制器共用同一個 key
     }
 
     void Update()

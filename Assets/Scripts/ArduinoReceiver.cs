@@ -19,11 +19,41 @@ public class ArduinoReceiver : MonoBehaviour
     public Vector2 joystick = new Vector2(500, 500);
     public bool isButtonPressed = false;
 
+    public bool IsConnected => serialPort != null && serialPort.IsOpen;
+
     void Awake()
     {
         // 確保切換場景或重複加載時不會中斷
         distance = 50f;
+        // 套用設定選單儲存的 COM Port (控制器分頁)
+        portName = PlayerPrefs.GetString("COM_Port", portName);
         OpenConnection();
+    }
+
+    /// <summary>
+    /// 以新的 COM Port 重新連線 (設定選單修改 COM Port 後呼叫)
+    /// </summary>
+    public void Reconnect(string newPort)
+    {
+        if (string.IsNullOrWhiteSpace(newPort)) return;
+        CloseConnection();
+        portName = newPort.Trim().ToUpperInvariant();
+        distance = 50f;
+        OpenConnection();
+    }
+
+    void CloseConnection()
+    {
+        isRunning = false;
+        if (readThread != null && readThread.IsAlive)
+            readThread.Join(200);
+        readThread = null;
+
+        if (serialPort != null)
+        {
+            try { if (serialPort.IsOpen) serialPort.Close(); } catch (Exception) { }
+            serialPort = null;
+        }
     }
 
     void OpenConnection()
@@ -47,11 +77,12 @@ public class ArduinoReceiver : MonoBehaviour
 
     void ReadSerialData()
     {
-        while (isRunning && serialPort != null && serialPort.IsOpen)
+        SerialPort sp = serialPort; // 區域參考，避免 Reconnect 時欄位被換掉造成 NullReference
+        while (isRunning && sp != null && sp.IsOpen)
         {
             try
             {
-                string data = serialPort.ReadLine();
+                string data = sp.ReadLine();
                 ParseData(data);
             }
             catch (TimeoutException) { }
@@ -88,16 +119,11 @@ public class ArduinoReceiver : MonoBehaviour
 
     void OnApplicationQuit()
     {
-        isRunning = false;
-        if (readThread != null && readThread.IsAlive)
-            readThread.Join(200);
-
-        if (serialPort != null && serialPort.IsOpen)
-            serialPort.Close();
+        CloseConnection();
     }
 
     void OnDestroy()
     {
-        OnApplicationQuit();
+        CloseConnection();
     }
 }

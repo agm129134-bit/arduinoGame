@@ -594,7 +594,7 @@ public class RollingSkyGameManager : MonoBehaviour
         inGameControllerPanel = CreateSubPanel(panel.transform, "InGameControllerPanel");
 
         CreateText(inGameControllerPanel.transform, "Lbl_Tilt", "陀螺儀轉向靈敏度:", 26, Color.white, new Vector2(-200, 140), new Vector2(340, 45), font, FontStyle.Bold);
-        sliderTiltSensitivity = CreateSlider(inGameControllerPanel.transform, "Slider_TiltSensitivity", new Vector2(100, 140), new Vector2(240, 26), 0.5f, 3.5f, PlayerPrefs.GetFloat("Tilt_Sensitivity", 1.8f));
+        sliderTiltSensitivity = CreateSlider(inGameControllerPanel.transform, "Slider_TiltSensitivity", new Vector2(100, 140), new Vector2(240, 26), 0.5f, 3.5f, PlayerPrefs.GetFloat("Tilt_Sensitivity", 2.6f));
         txtTiltSensitivity = CreateText(inGameControllerPanel.transform, "Txt_TiltVal", $"{sliderTiltSensitivity.value:F2}", 26, Color.cyan, new Vector2(270, 140), new Vector2(80, 45), font, FontStyle.Bold);
         sliderTiltSensitivity.onValueChanged.AddListener(val => {
             if (txtTiltSensitivity != null) txtTiltSensitivity.text = $"{val:F2}";
@@ -603,7 +603,7 @@ public class RollingSkyGameManager : MonoBehaviour
         });
 
         CreateText(inGameControllerPanel.transform, "Lbl_Deadzone", "手抖死區過濾 (DEADZONE):", 26, Color.white, new Vector2(-200, 75), new Vector2(340, 45), font, FontStyle.Bold);
-        sliderTiltDeadzone = CreateSlider(inGameControllerPanel.transform, "Slider_TiltDeadzone", new Vector2(100, 75), new Vector2(240, 26), 0.01f, 0.20f, PlayerPrefs.GetFloat("Tilt_Deadzone", 0.08f));
+        sliderTiltDeadzone = CreateSlider(inGameControllerPanel.transform, "Slider_TiltDeadzone", new Vector2(100, 75), new Vector2(240, 26), 0.01f, 0.20f, PlayerPrefs.GetFloat("Tilt_Deadzone", 0.04f));
         txtTiltDeadzone = CreateText(inGameControllerPanel.transform, "Txt_DeadVal", $"{sliderTiltDeadzone.value:F2}", 26, Color.cyan, new Vector2(270, 75), new Vector2(80, 45), font, FontStyle.Bold);
         sliderTiltDeadzone.onValueChanged.AddListener(val => {
             if (txtTiltDeadzone != null) txtTiltDeadzone.text = $"{val:F2}";
@@ -626,6 +626,9 @@ public class RollingSkyGameManager : MonoBehaviour
         sliderJumpDistance.onValueChanged.AddListener(val => {
             if (txtJumpDistance != null) txtJumpDistance.text = $"{val:F0} cm";
             PlayerPrefs.SetFloat("Jump_Distance", val);
+            // RollingSkyJumpDetector 只在 Start 讀取一次，需即時同步 (RollingSkyBallController 每幀讀 PlayerPrefs)
+            RollingSkyJumpDetector jumpDet = FindAnyObjectByType<RollingSkyJumpDetector>();
+            if (jumpDet != null) jumpDet.triggerDistance = val;
         });
 
         // 控制器監視板
@@ -837,8 +840,8 @@ public class RollingSkyGameManager : MonoBehaviour
         PlayerPrefs.SetInt("Key_Jump", (int)KeyCode.Space);
 
         PlayerPrefs.SetFloat("Keyboard_Speed", 9.0f);
-        PlayerPrefs.SetFloat("Tilt_Sensitivity", 1.8f);
-        PlayerPrefs.SetFloat("Tilt_Deadzone", 0.08f);
+        PlayerPrefs.SetFloat("Tilt_Sensitivity", 2.6f);
+        PlayerPrefs.SetFloat("Tilt_Deadzone", 0.04f);
         PlayerPrefs.SetFloat("Jump_Distance", 20.0f);
         PlayerPrefs.SetFloat("Camera_Sensitivity", 2.0f);
         PlayerPrefs.Save();
@@ -883,7 +886,7 @@ public class RollingSkyGameManager : MonoBehaviour
         bg.transform.SetParent(sliderObj.transform, false);
         Image bgImg = bg.AddComponent<Image>();
         bgImg.color = new Color(0.12f, 0.16f, 0.25f, 0.9f);
-        bgImg.raycastTarget = false;
+        bgImg.raycastTarget = true; // 讓整條滑軌可點擊/拖曳，而非只有 24px 的把手
         RectTransform bgRect = bg.GetComponent<RectTransform>();
         bgRect.anchorMin = Vector2.zero; bgRect.anchorMax = Vector2.one; bgRect.sizeDelta = Vector2.zero;
 
@@ -939,6 +942,12 @@ public class RollingSkyGameManager : MonoBehaviour
         {
             inGameSettingsPanel.transform.SetAsLastSibling();
             inGameSettingsPanel.SetActive(true);
+            // 設定面板導航由 HandleInGameSettingsNavigation 負責；關閉 EventSystem 內建方向鍵導航，避免滑鼠點過的 Slider 被雙重調整
+            if (EventSystem.current != null)
+            {
+                EventSystem.current.sendNavigationEvents = false;
+                EventSystem.current.SetSelectedGameObject(null);
+            }
 
             currentKeyLeft = (KeyCode)PlayerPrefs.GetInt("Key_Left", (int)KeyCode.A);
             currentKeyRight = (KeyCode)PlayerPrefs.GetInt("Key_Right", (int)KeyCode.D);
@@ -946,8 +955,8 @@ public class RollingSkyGameManager : MonoBehaviour
             UpdateInGameKeyTexts();
 
             if (sliderKeyboardSpeed != null) sliderKeyboardSpeed.value = PlayerPrefs.GetFloat("Keyboard_Speed", 9.0f);
-            if (sliderTiltSensitivity != null) sliderTiltSensitivity.value = PlayerPrefs.GetFloat("Tilt_Sensitivity", 1.8f);
-            if (sliderTiltDeadzone != null) sliderTiltDeadzone.value = PlayerPrefs.GetFloat("Tilt_Deadzone", 0.08f);
+            if (sliderTiltSensitivity != null) sliderTiltSensitivity.value = PlayerPrefs.GetFloat("Tilt_Sensitivity", 2.6f);
+            if (sliderTiltDeadzone != null) sliderTiltDeadzone.value = PlayerPrefs.GetFloat("Tilt_Deadzone", 0.04f);
             if (sliderJumpDistance != null) sliderJumpDistance.value = PlayerPrefs.GetFloat("Jump_Distance", 20.0f);
             if (sliderCamSensitivity != null) sliderCamSensitivity.value = PlayerPrefs.GetFloat("Camera_Sensitivity", 2.0f);
             if (sliderInGameMouseSens != null) sliderInGameMouseSens.value = PlayerPrefs.GetFloat("Camera_Sensitivity", 2.0f);
@@ -1673,6 +1682,7 @@ public class RollingSkyGameManager : MonoBehaviour
     public class InGameAccordionButton
     {
         public Button button;
+        public Slider slider; // 非 null 時：左右鍵 / 搖桿左右直接調整數值 (設定面板控制器分頁)
         public RectTransform rectTransform;
         public Image image;
         public Text text;
@@ -1801,6 +1811,14 @@ public class RollingSkyGameManager : MonoBehaviour
             RegisterInGameAccordionButton(inGameKeyboardPanel, "Btn_KeyRight", 0, 2, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
             RegisterInGameAccordionButton(inGameKeyboardPanel, "Btn_KeyJump", 0, 3, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
         }
+        else if (tabIndex == 2 && inGameControllerPanel != null)
+        {
+            // Row 1~4: 控制器滑桿 (左右鍵 / 搖桿左右調整數值)
+            RegisterInGameAccordionButton(inGameControllerPanel, "Slider_TiltSensitivity", 0, 1, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameControllerPanel, "Slider_TiltDeadzone", 0, 2, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameControllerPanel, "Slider_CamSensitivity", 0, 3, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+            RegisterInGameAccordionButton(inGameControllerPanel, "Slider_JumpDistance", 0, 4, inGameSettingsButtons, (c, r) => { activeInGameNavCol = c; activeInGameNavRow = r; isInGameNavActive = true; });
+        }
         else if (tabIndex == 3 && inGameAudioPanel != null)
         {
             // Row 1: 3 款 BGM 曲目
@@ -1825,11 +1843,19 @@ public class RollingSkyGameManager : MonoBehaviour
         if (t == null) return;
 
         Button btn = t.GetComponent<Button>();
+        Slider sld = t.GetComponent<Slider>();
         RectTransform rt = t.GetComponent<RectTransform>();
         Image img = t.GetComponent<Image>();
         Text txt = t.GetComponentInChildren<Text>();
 
-        if (btn == null || rt == null) return;
+        if ((btn == null && sld == null) || rt == null) return;
+
+        // Slider 本身沒有 Image：改用其 Background 作為高亮目標
+        if (img == null && sld != null)
+        {
+            Transform bg = t.Find("Background");
+            if (bg != null) img = bg.GetComponent<Image>();
+        }
 
         // 文字防切核心加固：強制溢出模式
         if (txt != null)
@@ -1840,6 +1866,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
         InGameAccordionButton item = new InGameAccordionButton();
         item.button = btn;
+        item.slider = sld;
         item.rectTransform = rt;
         item.image = img;
         item.text = txt;
@@ -1848,6 +1875,7 @@ public class RollingSkyGameManager : MonoBehaviour
         item.row = row;
 
         if (img != null) item.normalColor = img.color;
+        if (sld != null) item.normalColor = new Color(0.12f, 0.16f, 0.25f, 0.9f); // 與 CreateSlider 的 Background 原色一致 (避免抓到尚未淡出的高亮色)
 
         EventTrigger trigger = t.gameObject.GetComponent<EventTrigger>();
         if (trigger == null) trigger = t.gameObject.AddComponent<EventTrigger>();
@@ -1936,6 +1964,7 @@ public class RollingSkyGameManager : MonoBehaviour
                     // 設定選單 (allowPush == false)：採用優雅就地高光微縮放 1.07x，保持多欄對齊不移位
                     // 一般選單 (allowPush == true)：居中放大 1.15x，發光高亮
                     targetScale = allowPush ? SELECTED_SCALE : 1.07f;
+                    if (item.slider != null) targetScale = 1.0f; // Slider 只變色不縮放，避免拖曳時滑軌尺寸跳動
                     targetColor = item.highlightColor;
                     targetTextColor = item.highlightTextColor;
                     targetPos = item.basePos;
@@ -2071,6 +2100,27 @@ public class RollingSkyGameManager : MonoBehaviour
     void HandleInGameSettingsNavigation(bool moveUp, bool moveDown, bool moveLeft, bool moveRight, bool confirm)
     {
         if (inGameSettingsButtons == null || inGameSettingsButtons.Count == 0) return;
+
+        // 焦點在 Slider 上：左右鍵 (按住可連續) / 搖桿左右 直接調整數值，而不是移動欄位
+        var focusedItem = (activeInGameNavRow != 0) ? inGameSettingsButtons.Find(b => b.row == activeInGameNavRow && b.column == activeInGameNavCol) : null;
+        if (focusedItem != null && focusedItem.slider != null)
+        {
+            bool holdLeft = Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow);
+            bool holdRight = Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow);
+            int dir = 0;
+            if (moveLeft || (holdLeft && inGameNavCooldownTimer <= 0f)) dir = -1;
+            else if (moveRight || (holdRight && inGameNavCooldownTimer <= 0f)) dir = 1;
+            Slider s = focusedItem.slider;
+            if (dir != 0 && s.interactable)
+            {
+                float step = s.wholeNumbers ? 1f : (s.maxValue - s.minValue) / 20f;
+                s.value = Mathf.Clamp(s.value + dir * step, s.minValue, s.maxValue); // 觸發 onValueChanged → 更新文字、寫入 PlayerPrefs、ReloadSettings
+                inGameNavCooldownTimer = 0.15f;
+                isInGameNavActive = true;
+            }
+            moveLeft = false;
+            moveRight = false;
+        }
 
         if (inGameNavCooldownTimer <= 0f)
         {

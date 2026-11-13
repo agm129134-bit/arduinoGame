@@ -135,6 +135,9 @@ public class RollingSkyMenuManager : MonoBehaviour
             esObj.AddComponent<EventSystem>();
             esObj.AddComponent<StandaloneInputModule>();
         }
+        // 選單導航完全由 HandleMenuNavigationInput 負責；關閉 EventSystem 內建方向鍵/Submit 導航，
+        // 避免滑鼠點過的 Slider 被方向鍵雙重調整、或 Enter 重複觸發按鈕
+        if (EventSystem.current != null) EventSystem.current.sendNavigationEvents = false;
 
         // 確保 AudioManager 存在
         if (AudioManager.Instance == null && FindAnyObjectByType<AudioManager>() == null)
@@ -353,12 +356,13 @@ public class RollingSkyMenuManager : MonoBehaviour
             sliderKeyboardSpeed.onValueChanged.AddListener(OnKeyboardSpeedChanged);
         }
 
-        // 控制器滑桿監聽
+        // 控制器滑桿監聽 (即時寫入 PlayerPrefs，key 與 RollingSkyBallController / RollingSkyJumpDetector 一致)
         if (sliderTiltSensitivity != null)
         {
             sliderTiltSensitivity.onValueChanged.RemoveAllListeners();
             sliderTiltSensitivity.onValueChanged.AddListener(v => {
                 if (txtTiltSensitivity != null) txtTiltSensitivity.text = v.ToString("F2");
+                PlayerPrefs.SetFloat("Tilt_Sensitivity", v);
             });
         }
         if (sliderTiltDeadzone != null)
@@ -366,6 +370,7 @@ public class RollingSkyMenuManager : MonoBehaviour
             sliderTiltDeadzone.onValueChanged.RemoveAllListeners();
             sliderTiltDeadzone.onValueChanged.AddListener(v => {
                 if (txtTiltDeadzone != null) txtTiltDeadzone.text = v.ToString("F2");
+                PlayerPrefs.SetFloat("Tilt_Deadzone", v);
             });
         }
         if (sliderJumpDistance != null)
@@ -373,13 +378,22 @@ public class RollingSkyMenuManager : MonoBehaviour
             sliderJumpDistance.onValueChanged.RemoveAllListeners();
             sliderJumpDistance.onValueChanged.AddListener(v => {
                 if (txtJumpDistance != null) txtJumpDistance.text = $"{v:F0} cm";
+                PlayerPrefs.SetFloat("Jump_Distance", v);
             });
+        }
+        if (comPortInput != null)
+        {
+            comPortInput.onEndEdit.RemoveAllListeners();
+            comPortInput.onEndEdit.AddListener(ApplyComPort);
         }
         if (sliderCamSensitivity != null)
         {
             sliderCamSensitivity.onValueChanged.RemoveAllListeners();
+            // 注意：此處會覆蓋 RepositionAndEnsureControllerUI 綁定的監聽，因此需保留寫入 PlayerPrefs 與滑鼠靈敏度同步
             sliderCamSensitivity.onValueChanged.AddListener(v => {
                 if (txtCamSensitivity != null) txtCamSensitivity.text = $"{v:F1}x";
+                if (sliderMouseSensitivity != null) sliderMouseSensitivity.value = v;
+                PlayerPrefs.SetFloat("Camera_Sensitivity", v);
             });
         }
 
@@ -1347,11 +1361,11 @@ public class RollingSkyMenuManager : MonoBehaviour
 
         if (comPortInput != null && !string.IsNullOrEmpty(comPortInput.text))
         {
-            PlayerPrefs.SetString("COM_Port", comPortInput.text.Trim());
+            ApplyComPort(comPortInput.text);
         }
         if (sliderTiltSensitivity != null) PlayerPrefs.SetFloat("Tilt_Sensitivity", sliderTiltSensitivity.value);
         if (sliderTiltDeadzone != null) PlayerPrefs.SetFloat("Tilt_Deadzone", sliderTiltDeadzone.value);
-        if (sliderJumpDistance != null) PlayerPrefs.SetFloat("Ultrasonic_Jump_Distance", sliderJumpDistance.value);
+        if (sliderJumpDistance != null) PlayerPrefs.SetFloat("Jump_Distance", sliderJumpDistance.value);
         if (sliderCamSensitivity != null) PlayerPrefs.SetFloat("Camera_Sensitivity", sliderCamSensitivity.value);
 
         PlayerPrefs.SetInt("BGM_Track_Index", currentBgmIndex);
@@ -1362,6 +1376,23 @@ public class RollingSkyMenuManager : MonoBehaviour
         Debug.Log("🎉 所有設定已成功保存至 PlayerPrefs！");
 
         ShowPanel(mainMenuPanel);
+    }
+
+    // COM Port 輸入完成 (Enter / 失焦) 或儲存時：寫入 PlayerPrefs 並讓 ArduinoReceiver 以新 Port 重新連線
+    void ApplyComPort(string port)
+    {
+        inputEndEditFrame = Time.frameCount;
+        if (string.IsNullOrWhiteSpace(port)) return;
+        port = port.Trim().ToUpperInvariant();
+        if (comPortInput != null && comPortInput.text != port) comPortInput.text = port;
+        PlayerPrefs.SetString("COM_Port", port);
+        PlayerPrefs.Save();
+        if (arduino == null) arduino = FindAnyObjectByType<ArduinoReceiver>();
+        if (arduino != null && (arduino.portName != port || !arduino.IsConnected))
+        {
+            arduino.Reconnect(port);
+        }
+        Debug.Log($"[Settings] COM Port 已套用: {port} (連線狀態: {(arduino != null && arduino.IsConnected ? "已連線" : "未連線")})");
     }
 
     public void OnResetDefaults()
@@ -1383,8 +1414,8 @@ public class RollingSkyMenuManager : MonoBehaviour
         if (sliderKeyboardSpeed != null) sliderKeyboardSpeed.value = 9.0f;
 
         if (comPortInput != null) comPortInput.text = "COM3";
-        if (sliderTiltSensitivity != null) sliderTiltSensitivity.value = 1.8f;
-        if (sliderTiltDeadzone != null) sliderTiltDeadzone.value = 0.08f;
+        if (sliderTiltSensitivity != null) sliderTiltSensitivity.value = 2.6f;
+        if (sliderTiltDeadzone != null) sliderTiltDeadzone.value = 0.04f;
         if (sliderJumpDistance != null) sliderJumpDistance.value = 20.0f;
         if (sliderCamSensitivity != null)
         {
@@ -1477,17 +1508,21 @@ public class RollingSkyMenuManager : MonoBehaviour
         }
         if (sliderTiltSensitivity != null)
         {
-            sliderTiltSensitivity.value = PlayerPrefs.GetFloat("Tilt_Sensitivity", 1.8f);
+            sliderTiltSensitivity.value = PlayerPrefs.GetFloat("Tilt_Sensitivity", 2.6f);
             if (txtTiltSensitivity != null) txtTiltSensitivity.text = sliderTiltSensitivity.value.ToString("F2");
         }
         if (sliderTiltDeadzone != null)
         {
-            sliderTiltDeadzone.value = PlayerPrefs.GetFloat("Tilt_Deadzone", 0.08f);
+            sliderTiltDeadzone.value = PlayerPrefs.GetFloat("Tilt_Deadzone", 0.04f);
             if (txtTiltDeadzone != null) txtTiltDeadzone.text = sliderTiltDeadzone.value.ToString("F2");
         }
         if (sliderJumpDistance != null)
         {
-            sliderJumpDistance.value = PlayerPrefs.GetFloat("Ultrasonic_Jump_Distance", 20.0f);
+            // 與遊戲內設定面板一致 (10~40 cm)，避免遊戲內設定 >35 回主選單被截斷
+            sliderJumpDistance.minValue = 10f;
+            sliderJumpDistance.maxValue = 40f;
+            // 舊版選單誤存於 "Ultrasonic_Jump_Distance"，遊戲端讀取 "Jump_Distance"；優先讀新 key，舊值作為後備
+            sliderJumpDistance.value = PlayerPrefs.GetFloat("Jump_Distance", PlayerPrefs.GetFloat("Ultrasonic_Jump_Distance", 20.0f));
             if (txtJumpDistance != null) txtJumpDistance.text = $"{sliderJumpDistance.value:F0} cm";
         }
         float camSens = PlayerPrefs.GetFloat("Camera_Sensitivity", 2.0f);
@@ -1677,7 +1712,7 @@ public class RollingSkyMenuManager : MonoBehaviour
     void UpdateHardwareReadout()
     {
         if (hardwareStatusText == null) return;
-        if (arduino != null && arduino.distance > 0)
+        if (arduino != null && arduino.IsConnected)
         {
             hardwareStatusText.text = $"• 實體裝置連線中 (Port: {arduino.portName})\n" +
                                       $"超音波測距: {arduino.distance:F1} cm (上下揮手測試起跳)\n" +
@@ -1686,7 +1721,8 @@ public class RollingSkyMenuManager : MonoBehaviour
         }
         else
         {
-            hardwareStatusText.text = "• 尚未偵測到實體硬體 (純鍵盤測試模式運作中)";
+            string port = (arduino != null) ? arduino.portName : (comPortInput != null ? comPortInput.text : "?");
+            hardwareStatusText.text = $"• 尚未偵測到實體硬體 (Port: {port}，純鍵盤測試模式運作中)";
             hardwareStatusText.color = Color.yellow;
         }
     }
@@ -1782,7 +1818,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         bg.transform.SetParent(sliderObj.transform, false);
         Image bgImg = bg.AddComponent<Image>();
         bgImg.color = new Color(0.12f, 0.16f, 0.25f, 0.9f);
-        bgImg.raycastTarget = false;
+        bgImg.raycastTarget = true; // 讓整條滑軌可點擊/拖曳，而非只有 24px 的把手
         RectTransform bgRect = bg.GetComponent<RectTransform>();
         bgRect.anchorMin = Vector2.zero; bgRect.anchorMax = Vector2.one; bgRect.sizeDelta = Vector2.zero;
 
@@ -1822,6 +1858,8 @@ public class RollingSkyMenuManager : MonoBehaviour
     public class MenuAccordionButton
     {
         public Button button;
+        public Slider slider;      // 非 null 時：左右鍵 / 搖桿左右直接調整數值
+        public InputField input;   // 非 null 時：確認鍵進入輸入
         public RectTransform rectTransform;
         public Image image;
         public Text text;
@@ -1839,6 +1877,8 @@ public class RollingSkyMenuManager : MonoBehaviour
     private List<MenuAccordionButton> shopButtons = new List<MenuAccordionButton>();
     private List<MenuAccordionButton> activeSettingsButtons = new List<MenuAccordionButton>();
     private int currentSettingsTab = 0;
+    private const int SETTINGS_BOTTOM_ROW = 6; // 設定面板底部三大按鈕所在列 (控制器分頁用到 Row 1~5)
+    private int inputEndEditFrame = -1;
 
     private int activeNavCol = 0; // 0: 左欄, 1: 右欄
     private int activeNavRow = 0; // 縱向索引
@@ -1940,6 +1980,15 @@ public class RollingSkyMenuManager : MonoBehaviour
             RegisterAccordionButton(keyboardSettingsPanel, "Btn_KeyRight", 0, 2, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
             RegisterAccordionButton(keyboardSettingsPanel, "Btn_KeyJump", 0, 3, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
         }
+        else if (tabIndex == 2 && controllerSettingsPanel != null)
+        {
+            // Row 1: COM Port 輸入框 (確認鍵進入輸入)；Row 2~5: 滑桿 (左右鍵 / 搖桿左右調整數值)
+            RegisterSettingsNavControl(comPortInput, 1);
+            RegisterSettingsNavControl(sliderTiltSensitivity, 2);
+            RegisterSettingsNavControl(sliderTiltDeadzone, 3);
+            RegisterSettingsNavControl(sliderCamSensitivity, 4);
+            RegisterSettingsNavControl(sliderJumpDistance, 5);
+        }
         else if (tabIndex == 3 && audioSettingsPanel != null)
         {
             // Row 1: 3 款 BGM 曲目
@@ -1951,12 +2000,36 @@ public class RollingSkyMenuManager : MonoBehaviour
             RegisterAccordionButton(audioSettingsPanel, "Btn_TestSfx", 0, 2, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
         }
 
-        // Row 5: 底部三大全局按鈕
-        RegisterAccordionButton(settingsPanel, "Btn_ResetDefaults", 0, 5, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
-        RegisterAccordionButton(settingsPanel, "Btn_ResetAllSave", 1, 5, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
-        RegisterAccordionButton(settingsPanel, "Btn_SaveBack", 2, 5, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+        // 底部三大全局按鈕 (Row SETTINGS_BOTTOM_ROW)
+        RegisterAccordionButton(settingsPanel, "Btn_ResetDefaults", 0, SETTINGS_BOTTOM_ROW, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+        RegisterAccordionButton(settingsPanel, "Btn_ResetAllSave", 1, SETTINGS_BOTTOM_ROW, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+        RegisterAccordionButton(settingsPanel, "Btn_SaveBack", 2, SETTINGS_BOTTOM_ROW, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
 
         EnsureAllButtonsTextSafe();
+    }
+
+    void RegisterSettingsNavControl(Selectable control, int row)
+    {
+        if (control == null || control.transform.parent == null) return;
+        RegisterAccordionButton(control.transform.parent.gameObject, control.name, 0, row, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+    }
+
+    private Dictionary<Graphic, Color> navOriginalColors = new Dictionary<Graphic, Color>();
+    Color GetNavOriginalColor(Graphic g)
+    {
+        if (!navOriginalColors.TryGetValue(g, out Color c))
+        {
+            c = g.color;
+            navOriginalColors[g] = c;
+        }
+        return c;
+    }
+
+    void StepSlider(Slider s, int dir)
+    {
+        if (s == null || !s.interactable) return;
+        float step = s.wholeNumbers ? 1f : (s.maxValue - s.minValue) / 20f;
+        s.value = Mathf.Clamp(s.value + dir * step, s.minValue, s.maxValue); // 觸發 onValueChanged → 更新數值文字並寫入 PlayerPrefs
     }
 
     void EnsureAllButtonsTextSafe()
@@ -1983,11 +2056,20 @@ public class RollingSkyMenuManager : MonoBehaviour
         if (t == null) return;
 
         Button btn = t.GetComponent<Button>();
+        Slider sld = t.GetComponent<Slider>();
+        InputField inp = t.GetComponent<InputField>();
         RectTransform rt = t.GetComponent<RectTransform>();
         Image img = t.GetComponent<Image>();
         Text txt = t.GetComponentInChildren<Text>();
 
-        if (btn == null || rt == null) return;
+        if ((btn == null && sld == null && inp == null) || rt == null) return;
+
+        // Slider 本身沒有 Image：改用其 Background 作為高亮目標
+        if (img == null && sld != null)
+        {
+            Transform bg = t.Find("Background");
+            if (bg != null) img = bg.GetComponent<Image>();
+        }
 
         // 文字防切核心加固
         if (txt != null)
@@ -1998,6 +2080,8 @@ public class RollingSkyMenuManager : MonoBehaviour
 
         MenuAccordionButton item = new MenuAccordionButton();
         item.button = btn;
+        item.slider = sld;
+        item.input = inp;
         item.rectTransform = rt;
         item.image = img;
         item.text = txt;
@@ -2006,6 +2090,12 @@ public class RollingSkyMenuManager : MonoBehaviour
         item.row = row;
 
         if (img != null) item.normalColor = img.color;
+        if (btn == null)
+        {
+            // Slider / InputField：記住第一次註冊時的原色，避免切換分頁時把尚未淡出的高亮色當成原色
+            if (img != null) item.normalColor = GetNavOriginalColor(img);
+            if (txt != null) item.normalTextColor = GetNavOriginalColor(txt);
+        }
 
         // 綁定 EventTrigger 實現滑鼠懸停 (PointerEnter) 與搖桿焦點無縫雙向連動
         EventTrigger trigger = t.gameObject.GetComponent<EventTrigger>();
@@ -2067,6 +2157,7 @@ public class RollingSkyMenuManager : MonoBehaviour
                     // 設定選單 (allowPush == false)：採用優雅就地高光微縮放 1.07x，保持多欄對齊不移位
                     // 一般選單 (allowPush == true)：居中放大 1.15x，發光高亮
                     targetScale = allowPush ? SELECTED_SCALE : 1.07f;
+                    if (item.button == null) targetScale = 1.0f; // Slider / InputField 只變色不縮放，避免拖曳時滑軌尺寸跳動
                     targetColor = item.highlightColor;
                     targetTextColor = item.highlightTextColor;
                     targetPos = item.basePos;
@@ -2111,6 +2202,11 @@ public class RollingSkyMenuManager : MonoBehaviour
         {
             navCooldownTimer -= Time.unscaledDeltaTime;
         }
+
+        // 正在 COM Port 輸入框打字 (或本幀剛按 Enter 結束輸入)：WASD / Enter / Space 屬於文字輸入，不做選單導航
+        GameObject selObj = (EventSystem.current != null) ? EventSystem.current.currentSelectedGameObject : null;
+        InputField focusedField = (selObj != null) ? selObj.GetComponent<InputField>() : null;
+        if ((focusedField != null && focusedField.isFocused) || Time.frameCount == inputEndEditFrame) return;
 
         bool moveUp = false;
         bool moveDown = false;
@@ -2172,6 +2268,25 @@ public class RollingSkyMenuManager : MonoBehaviour
 
     void HandleSettingsPanelNavigation(bool moveUp, bool moveDown, bool moveLeft, bool moveRight, bool confirm)
     {
+        // 焦點在 Slider 上：左右鍵 (按住可連續) / 搖桿左右 直接調整數值，而不是移動欄位
+        var focusedItem = (activeNavRow != 0) ? activeSettingsButtons.Find(b => b.row == activeNavRow && b.column == activeNavCol) : null;
+        if (focusedItem != null && focusedItem.slider != null)
+        {
+            bool holdLeft = Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow);
+            bool holdRight = Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow);
+            int dir = 0;
+            if (moveLeft || (holdLeft && navCooldownTimer <= 0f)) dir = -1;
+            else if (moveRight || (holdRight && navCooldownTimer <= 0f)) dir = 1;
+            if (dir != 0)
+            {
+                StepSlider(focusedItem.slider, dir);
+                navCooldownTimer = 0.15f;
+                isMenuNavActive = true;
+            }
+            moveLeft = false;
+            moveRight = false;
+        }
+
         if (navCooldownTimer <= 0f)
         {
             if (moveUp)
@@ -2181,7 +2296,7 @@ public class RollingSkyMenuManager : MonoBehaviour
                 {
                     targetRow--;
                 }
-                if (targetRow < 0) targetRow = 5; // 循環到底部三大按鈕
+                if (targetRow < 0) targetRow = SETTINGS_BOTTOM_ROW; // 循環到底部三大按鈕
                 activeNavRow = targetRow;
 
                 var inRow = activeSettingsButtons.FindAll(b => b.row == activeNavRow);
@@ -2195,11 +2310,11 @@ public class RollingSkyMenuManager : MonoBehaviour
             else if (moveDown)
             {
                 int targetRow = activeNavRow + 1;
-                while (targetRow <= 5 && !activeSettingsButtons.Exists(b => b.row == targetRow))
+                while (targetRow <= SETTINGS_BOTTOM_ROW && !activeSettingsButtons.Exists(b => b.row == targetRow))
                 {
                     targetRow++;
                 }
-                if (targetRow > 5) targetRow = 0; // 循環回頂部 Tab
+                if (targetRow > SETTINGS_BOTTOM_ROW) targetRow = 0; // 循環回頂部 Tab
                 activeNavRow = targetRow;
 
                 var inRow = activeSettingsButtons.FindAll(b => b.row == activeNavRow);
@@ -2321,6 +2436,15 @@ public class RollingSkyMenuManager : MonoBehaviour
         var target = group.Find(b => b.column == col && b.row == row);
         // 若找不到完全匹配 (例如底部返回按鈕跨欄)，嘗試放寬尋找該 row
         if (target == null) target = group.Find(b => b.row == row);
+
+        // 輸入框 (COM Port)：確認鍵進入輸入狀態，Enter 結束後由 onEndEdit 套用
+        if (target != null && target.input != null && target.input.interactable)
+        {
+            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(target.input.gameObject);
+            target.input.ActivateInputField();
+            navCooldownTimer = 0.28f;
+            return;
+        }
 
         if (target != null && target.button != null && target.button.interactable)
         {
