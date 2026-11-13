@@ -1159,7 +1159,17 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         gem.transform.SetParent(parent);
         gem.transform.position = new Vector3(pos.x, pos.y + 1.15f, pos.z);
         gem.transform.localScale = Vector3.one;
+        AddGemCollider(gem);
         gem.AddComponent<GemCollectible>();
+    }
+
+    // GemCollectible 需要 [RequireComponent(typeof(Collider))]，而 Collider 是抽象類別、Unity 無法自動補上；
+    // 必須先掛好觸發用 SphereCollider，否則 AddComponent<GemCollectible> 會失敗，寶石不會出現且數量顯示 0 / 0
+    static void AddGemCollider(GameObject gem)
+    {
+        SphereCollider sc = gem.AddComponent<SphereCollider>();
+        sc.isTrigger = true;
+        sc.radius = 0.55f;
     }
 
     void CreateAirborneGem(Transform parent, Vector3 pos)
@@ -1169,6 +1179,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         gem.transform.SetParent(parent);
         gem.transform.position = pos;
         gem.transform.localScale = Vector3.one;
+        AddGemCollider(gem);
         gem.AddComponent<GemCollectible>();
     }
 
