@@ -219,7 +219,7 @@ public class GemCollectible : MonoBehaviour
     {
         if (isCollected) return;
 
-        RollingSkyBallController ball = other.GetComponent<RollingSkyBallController>();
+        RollingSkyBallController ball = other.GetComponent<RollingSkyBallController>() ?? other.GetComponentInParent<RollingSkyBallController>();
         if (ball != null)
         {
             isCollected = true;

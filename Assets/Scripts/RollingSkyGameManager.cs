@@ -132,6 +132,14 @@ public class RollingSkyGameManager : MonoBehaviour
 
         isEndlessMode = (PlayerPrefs.GetInt("IsEndlessMode", 0) == 1);
 
+        // 新手教學模式：執行期加入 TutorialManager (自行生成教學賽道並接管流程)
+        if (PlayerPrefs.GetInt("IsTutorialMode", 0) == 1 && !isEndlessMode
+            && PlayerPrefs.GetInt("IsSkyTowerMode", 0) == 0 && FindAnyObjectByType<TutorialManager>() == null)
+        {
+            GameObject tutObj = new GameObject("TutorialManager");
+            tutObj.AddComponent<TutorialManager>();
+        }
+
         if (ball == null)
         {
             RollingSkyBallController bc = FindAnyObjectByType<RollingSkyBallController>();
@@ -288,6 +296,9 @@ public class RollingSkyGameManager : MonoBehaviour
     }
 
     // --- 游標鎖定與隱藏控制 ---
+    /// <summary>新手教學完成畫面：標記為已結算 (不再點擊重鎖游標、停止進度更新)，不觸發通關存檔/面板</summary>
+    public void MarkTutorialFinished() { isVictory = true; }
+
     public void SetCursorLocked(bool locked)
     {
         if (isBuilderMode)
@@ -343,7 +354,8 @@ public class RollingSkyGameManager : MonoBehaviour
         if (pausePanel != null)
         {
             pausePanel.transform.SetAsLastSibling();
-            pausePanel.SetActive(isPaused);
+            if (isPaused) UIPanelAnimator.Show(pausePanel, 1.04f);
+            else UIPanelAnimator.Hide(pausePanel, 0.96f);
             if (isPaused)
             {
                 InitPauseMenuButtons();
@@ -356,7 +368,7 @@ public class RollingSkyGameManager : MonoBehaviour
 
         if (!isPaused && inGameSettingsPanel != null)
         {
-            inGameSettingsPanel.SetActive(false);
+            UIPanelAnimator.Hide(inGameSettingsPanel, 0.96f);
         }
 
         // 暫停時解除鎖定並顯示游標以供 UI 操作；繼續遊戲時隱藏並鎖定游標防滑出視窗
@@ -369,8 +381,8 @@ public class RollingSkyGameManager : MonoBehaviour
     {
         isPaused = false;
         Time.timeScale = 1.0f;
-        if (pausePanel != null) pausePanel.SetActive(false);
-        if (inGameSettingsPanel != null) inGameSettingsPanel.SetActive(false);
+        UIPanelAnimator.Hide(pausePanel, 0.96f);
+        UIPanelAnimator.Hide(inGameSettingsPanel, 0.96f);
         SetCursorLocked(true);
     }
 
@@ -707,13 +719,20 @@ public class RollingSkyGameManager : MonoBehaviour
         return panelObj;
     }
 
+    void SetInGameTabPanel(GameObject p, bool show)
+    {
+        if (p == null) return;
+        if (show) UIPanelAnimator.SwapIn(p);
+        else p.SetActive(false);
+    }
+
     public void SwitchInGameSettingsTab(int tabIndex)
     {
         currentInGameSettingsTab = tabIndex;
-        if (inGameDisplayPanel != null) inGameDisplayPanel.SetActive(tabIndex == 0);
-        if (inGameKeyboardPanel != null) inGameKeyboardPanel.SetActive(tabIndex == 1);
-        if (inGameControllerPanel != null) inGameControllerPanel.SetActive(tabIndex == 2);
-        if (inGameAudioPanel != null) inGameAudioPanel.SetActive(tabIndex == 3);
+        SetInGameTabPanel(inGameDisplayPanel, tabIndex == 0);
+        SetInGameTabPanel(inGameKeyboardPanel, tabIndex == 1);
+        SetInGameTabPanel(inGameControllerPanel, tabIndex == 2);
+        SetInGameTabPanel(inGameAudioPanel, tabIndex == 3);
 
         Color activeCol = new Color(0f, 0.5f, 0.9f);
         Color normalCol = new Color(0.1f, 0.22f, 0.38f);
@@ -937,11 +956,11 @@ public class RollingSkyGameManager : MonoBehaviour
 
     public void OpenInGameSettings()
     {
-        if (pausePanel != null) pausePanel.SetActive(false);
+        UIPanelAnimator.Hide(pausePanel, 0.95f);
         if (inGameSettingsPanel != null)
         {
             inGameSettingsPanel.transform.SetAsLastSibling();
-            inGameSettingsPanel.SetActive(true);
+            UIPanelAnimator.Show(inGameSettingsPanel, 1.05f);
             // 設定面板導航由 HandleInGameSettingsNavigation 負責；關閉 EventSystem 內建方向鍵導航，避免滑鼠點過的 Slider 被雙重調整
             if (EventSystem.current != null)
             {
@@ -974,11 +993,11 @@ public class RollingSkyGameManager : MonoBehaviour
     public void CloseInGameSettings()
     {
         if (isRebinding) return;
-        if (inGameSettingsPanel != null) inGameSettingsPanel.SetActive(false);
+        UIPanelAnimator.Hide(inGameSettingsPanel, 1.05f);
         if (pausePanel != null)
         {
             pausePanel.transform.SetAsLastSibling();
-            pausePanel.SetActive(true);
+            UIPanelAnimator.Show(pausePanel, 0.95f);
             InitPauseMenuButtons();
             activeInGameNavCol = 0;
             activeInGameNavRow = 0;
@@ -1444,16 +1463,13 @@ public class RollingSkyGameManager : MonoBehaviour
             return;
         }
 
-        RollingSkyBallController ballCtrl = ball != null ? ball.GetComponent<RollingSkyBallController>() : null;
-        string swayInfo = (ballCtrl != null && ballCtrl.enableSway && !isEndlessMode) ? $" | <color=yellow>平衡風力: {ballCtrl.CurrentSwayForce:+0.0;-0.0;0.0}</color>" : "";
-
         if (arduino != null && arduino.distance > 0)
         {
-            hardwareStatusText.text = $"超音波測距: <color=yellow>{arduino.distance:F1} cm</color> (揮手跳躍) | 傾斜感應: <color=cyan>{arduino.acceleration.x:F2}</color>{swayInfo} | <color=white>[ESC: 暫停選單]</color>";
+            hardwareStatusText.text = $"超音波測距: <color=yellow>{arduino.distance:F1} cm</color> (揮手跳躍) | 傾斜感應: <color=cyan>{arduino.acceleration.x:F2}</color> | <color=white>[ESC: 暫停選單]</color>";
         }
         else
         {
-            hardwareStatusText.text = $"鍵盤操作模式: [A/D: 左右移] | [Space: 跳躍] | [R: 重試]{swayInfo} | <color=cyan>[ESC: 暫停 / 回到選單]</color>";
+            hardwareStatusText.text = "鍵盤操作模式: [A/D: 左右移] | [Space: 跳躍] | [R: 重試] | <color=cyan>[ESC: 暫停 / 回到選單]</color>";
         }
     }
 
@@ -1516,7 +1532,7 @@ public class RollingSkyGameManager : MonoBehaviour
         isGameOver = true;
         SetCursorLocked(false);
 
-        if (pausePanel != null) pausePanel.SetActive(false);
+        UIPanelAnimator.Hide(pausePanel, 0.96f);
 
         float currentDist = (ball != null) ? ball.position.z - startZ : 0f;
 
@@ -1524,7 +1540,7 @@ public class RollingSkyGameManager : MonoBehaviour
         {
             EnsureGameOverPanelButtons(gameOverPanel, GetDefaultFont());
             gameOverPanel.transform.SetAsLastSibling();
-            gameOverPanel.SetActive(true);
+            UIPanelAnimator.Show(gameOverPanel, 1.06f);
             InitGameOverButtons();
             activeInGameNavCol = 0;
             activeInGameNavRow = 0;
@@ -1579,8 +1595,8 @@ public class RollingSkyGameManager : MonoBehaviour
         isVictory = true;
         SetCursorLocked(false);
 
-        if (pausePanel != null) pausePanel.SetActive(false);
-        if (inGameSettingsPanel != null) inGameSettingsPanel.SetActive(false);
+        UIPanelAnimator.Hide(pausePanel, 0.96f);
+        UIPanelAnimator.Hide(inGameSettingsPanel, 0.96f);
 
         // 平滑凍結小球物理，杜絕撞牆卡住或衝入虛空
         if (ball != null)
@@ -1665,7 +1681,7 @@ public class RollingSkyGameManager : MonoBehaviour
             }
 
             victoryPanel.transform.SetAsLastSibling();
-            victoryPanel.SetActive(true);
+            UIPanelAnimator.Show(victoryPanel, 1.06f);
             InitVictoryButtons();
             activeInGameNavCol = 0;
             activeInGameNavRow = 0;
@@ -1715,9 +1731,10 @@ public class RollingSkyGameManager : MonoBehaviour
     {
         if (pausePanel == null) return;
         pauseMenuButtons.Clear();
-        string[] btnNames = new string[] { "Btn_Resume", "Btn_Settings", "Btn_Restart", "Btn_MainMenu" };
+        string[] btnNames = new string[] { "Btn_Resume", "Btn_Settings", "Btn_Restart", "Btn_MainMenu", "Btn_SkipTutorial" };
         for (int r = 0; r < btnNames.Length; r++)
         {
+            // Btn_SkipTutorial 僅在新手教學中由 TutorialManager 加入；不存在時 Register 會直接略過
             RegisterInGameAccordionButton(pausePanel, btnNames[r], 0, r, pauseMenuButtons, (c, row) => {
                 activeInGameNavCol = c;
                 activeInGameNavRow = row;

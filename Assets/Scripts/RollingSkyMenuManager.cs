@@ -105,6 +105,10 @@ public class RollingSkyMenuManager : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
         if (arduino == null) arduino = FindAnyObjectByType<ArduinoReceiver>();
+
+        // 回到主選單即結束任何教學狀態 (之後由 Start / 新手教學按鈕重新決定)
+        PlayerPrefs.SetInt("IsTutorialMode", 0);
+        TutorialManager.ResetResume();
     }
 
     void OnEnable()
@@ -162,7 +166,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         LoadAllSettings();
 
         // 初始顯示主面板
-        if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
+        if (mainMenuPanel != null) UIPanelAnimator.Show(mainMenuPanel, 1.03f); // 開場：與場景淡入同步，按鈕依序浮現
         if (levelSelectPanel != null) levelSelectPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
         if (displaySettingsPanel != null) displaySettingsPanel.SetActive(false);
@@ -218,6 +222,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         BindButton(mainMenuPanel, "Btn_Levels", OnOpenLevelSelect);
         BindButton(mainMenuPanel, "Btn_Endless", OnOpenEndlessMode);
         BindButton(mainMenuPanel, "Btn_SkyTower", OnOpenSkyTowerMode);
+        BindButton(mainMenuPanel, "Btn_Tutorial", OnOpenTutorial);
         BindButton(mainMenuPanel, "Btn_Builder", OnOpenTrackBuilder);
         BindButton(mainMenuPanel, "Btn_Shop", OnOpenShop);
         BindButton(mainMenuPanel, "Btn_Settings", OnOpenSettings);
@@ -549,25 +554,85 @@ public class RollingSkyMenuManager : MonoBehaviour
         Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-        // 重新排版主選單按鈕，分為左右兩大功能面板 (左四個、右四個完美對稱排版，高度70，無重疊)
-        // 左側：四大遊玩模式 (X = -220)
-        RepositionButton(mainMenuPanel, "Btn_Start", "開始第一關 (START GAME)", new Vector2(-220, 70), new Vector2(400, 70), 28, font);
-        RepositionButton(mainMenuPanel, "Btn_Levels", "選擇關卡 (LEVEL SELECT)", new Vector2(-220, -15), new Vector2(400, 70), 28, font);
-        RepositionButton(mainMenuPanel, "Btn_Endless", "無盡極限跑酷 (ENDLESS MODE)", new Vector2(-220, -100), new Vector2(400, 70), 26, font);
-        RepositionButton(mainMenuPanel, "Btn_SkyTower", "通天天梯 (SKY TOWER)", new Vector2(-220, -185), new Vector2(400, 70), 26, font);
+        // ===== 主選單版面 (參考解析度 1920x1080，中心為原點) =====
+        //   標題 / 副標 / 狀態列
+        //   [          開始遊戲 (主按鈕, 880x100, 青綠強調)          ]
+        //   [ 選擇關卡 ] [ 無盡極限 ]      Row 1
+        //   [ 通天天梯 ] [ 新手教學 ]      Row 2
+        //   [ 皮膚商店 ] [ 場地編輯 ]      Row 3
+        //   [ 系統設定 ] [ 離開遊戲 ]      Row 4
+        //   操作提示
+        // 導航列/欄：Start=(col0,row0)；其餘 2 欄 × 4 列 (row 1~4)，共 5 列 (見 InitAccordionMenuButtons)
+        const float colX = 222f;
+        Vector2 gridSize = new Vector2(428, 76);
+        const int gridFont = 26;
+        Color gridColor = new Color(0.08f, 0.17f, 0.32f, 0.96f);
 
-        // 右側：系統、創造與商店 (X = 220)
-        RepositionButton(mainMenuPanel, "Btn_Shop", "球體皮膚商店 (SKIN SHOP)", new Vector2(220, 70), new Vector2(400, 70), 28, font);
-        RepositionButton(mainMenuPanel, "Btn_Builder", "自訂場地編輯器 (TRACK BUILDER)", new Vector2(220, -15), new Vector2(400, 70), 24, font);
-        RepositionButton(mainMenuPanel, "Btn_Settings", "系統設定 (SETTINGS)", new Vector2(220, -100), new Vector2(400, 70), 30, font);
-        RepositionButton(mainMenuPanel, "Btn_Exit", "離開遊戲 (EXIT)", new Vector2(220, -185), new Vector2(400, 70), 30, font);
+        bool tutorialDone = PlayerPrefs.GetInt("Tutorial_Completed", 0) == 1;
+        RepositionButton(mainMenuPanel, "Btn_Start", tutorialDone ? "▶  開始第一關 (START GAME)" : "▶  開始遊戲 (START / 新手教學)", new Vector2(0, 125), new Vector2(878, 100), 36, font);
 
-        // 頂部玩家資產與紀錄看板
+        RepositionButton(mainMenuPanel, "Btn_Levels", "選擇關卡 (LEVEL SELECT)", new Vector2(-colX, 10), gridSize, gridFont, font);
+        RepositionButton(mainMenuPanel, "Btn_Endless", "無盡極限跑酷 (ENDLESS MODE)", new Vector2(colX, 10), gridSize, gridFont, font);
+
+        RepositionButton(mainMenuPanel, "Btn_SkyTower", "通天天梯 (SKY TOWER)", new Vector2(-colX, -80), gridSize, gridFont, font);
+        RepositionButton(mainMenuPanel, "Btn_Tutorial", "新手教學 (TUTORIAL)", new Vector2(colX, -80), gridSize, gridFont, font);
+        BindButton(mainMenuPanel, "Btn_Tutorial", OnOpenTutorial); // 此函式可能在 BindAllButtonsRuntime 之後才建立按鈕，這裡補綁
+
+        RepositionButton(mainMenuPanel, "Btn_Shop", "球體皮膚商店 (SKIN SHOP)", new Vector2(-colX, -170), gridSize, gridFont, font);
+        RepositionButton(mainMenuPanel, "Btn_Builder", "自訂場地編輯器 (TRACK BUILDER)", new Vector2(colX, -170), gridSize, gridFont, font);
+
+        RepositionButton(mainMenuPanel, "Btn_Settings", "系統設定 (SETTINGS)", new Vector2(-colX, -260), gridSize, gridFont, font);
+        RepositionButton(mainMenuPanel, "Btn_Exit", "離開遊戲 (EXIT)", new Vector2(colX, -260), gridSize, gridFont, font);
+
+        // 統一外觀：主按鈕青綠、離開鈕暗紅、其餘深藍；全部加霓虹細邊框
+        string[] gridNames = { "Btn_Levels", "Btn_Endless", "Btn_SkyTower", "Btn_Tutorial", "Btn_Shop", "Btn_Builder", "Btn_Settings" };
+        foreach (string n in gridNames) StyleMenuButton(mainMenuPanel, n, gridColor);
+        StyleMenuButton(mainMenuPanel, "Btn_Start", new Color(0.0f, 0.42f, 0.56f, 1f));
+        StyleMenuButton(mainMenuPanel, "Btn_Exit", new Color(0.30f, 0.11f, 0.18f, 0.96f));
+
+        // 標題區：標題 / 副標 / 狀態列
+        SetTextLayout(mainMenuPanel, "Title", new Vector2(0, 345), new Vector2(1100, 110), 84);
+        SetTextLayout(mainMenuPanel, "Subtitle", new Vector2(0, 268), new Vector2(1100, 50), 28);
         Transform tStatus = mainMenuPanel.transform.Find("PlayerStatusText");
         if (tStatus == null)
         {
-            CreateText(mainMenuPanel.transform, "PlayerStatusText", "", 24, Color.yellow, new Vector2(0, 160), new Vector2(900, 50), font, FontStyle.Bold);
+            CreateText(mainMenuPanel.transform, "PlayerStatusText", "", 22, Color.yellow, new Vector2(0, 205), new Vector2(1100, 44), font, FontStyle.Bold);
         }
+        else
+        {
+            SetTextLayout(mainMenuPanel, "PlayerStatusText", new Vector2(0, 205), new Vector2(1100, 44), 22);
+        }
+
+        // 操作提示 (純文字，不參與導航)
+        if (mainMenuPanel.transform.Find("NavHint") == null)
+        {
+            CreateText(mainMenuPanel.transform, "NavHint", "W A S D / 方向鍵 / 搖桿 選擇　·　Enter / Space / 搖桿按鍵 確認", 20, new Color(0.55f, 0.7f, 0.85f, 0.85f), new Vector2(0, -352), new Vector2(1100, 36), font, FontStyle.Normal);
+        }
+    }
+
+    /// <summary>統一按鈕底色並加上霓虹細邊框 (Outline 只吃 Image，不影響文字與 Accordion 的顏色插值)</summary>
+    void StyleMenuButton(GameObject panel, string name, Color baseColor)
+    {
+        if (panel == null) return;
+        Transform t = panel.transform.Find(name);
+        if (t == null) return;
+        Image img = t.GetComponent<Image>();
+        if (img == null) return;
+        img.color = baseColor;
+        Outline ol = t.GetComponent<Outline>();
+        if (ol == null) ol = t.gameObject.AddComponent<Outline>();
+        ol.effectColor = new Color(0.1f, 0.85f, 1f, 0.35f);
+        ol.effectDistance = new Vector2(2f, -2f);
+    }
+
+    void SetTextLayout(GameObject panel, string name, Vector2 pos, Vector2 size, int fontSize)
+    {
+        Transform t = panel.transform.Find(name);
+        if (t == null) return;
+        RectTransform rt = t.GetComponent<RectTransform>();
+        if (rt != null) { rt.anchoredPosition = pos; rt.sizeDelta = size; }
+        Text txt = t.GetComponent<Text>();
+        if (txt != null) { txt.fontSize = fontSize; txt.alignment = TextAnchor.MiddleCenter; }
     }
 
     void RepositionButton(GameObject panel, string name, string label, Vector2 pos, Vector2 size, int fontSize, Font font)
@@ -1129,7 +1194,23 @@ public class RollingSkyMenuManager : MonoBehaviour
         PlayerPrefs.SetInt("IsSkyTowerMode", 0);
         PlayerPrefs.SetInt("IsEndlessMode", 0);
         PlayerPrefs.SetInt("IsBuilderMode", 0);
+        // 首次遊玩 (尚未完成新手教學) 直接進入教學；完成後 Start 直達第 1 關
+        PlayerPrefs.SetInt("IsTutorialMode", PlayerPrefs.GetInt("Tutorial_Completed", 0) == 0 ? 1 : 0);
         PlayerPrefs.Save();
+        SceneManager.LoadScene(gameSceneName);
+    }
+
+    /// <summary>主選單「新手教學」按鈕：隨時重玩教學 (重玩時可用 Tab / 暫停選單跳過)</summary>
+    public void OnOpenTutorial()
+    {
+        ClearEventFocus();
+        PlayerPrefs.SetInt("SelectedLevel", 1);
+        PlayerPrefs.SetInt("IsSkyTowerMode", 0);
+        PlayerPrefs.SetInt("IsEndlessMode", 0);
+        PlayerPrefs.SetInt("IsBuilderMode", 0);
+        PlayerPrefs.SetInt("IsTutorialMode", 1);
+        PlayerPrefs.Save();
+        TutorialManager.ResetResume();
         SceneManager.LoadScene(gameSceneName);
     }
 
@@ -1200,14 +1281,18 @@ public class RollingSkyMenuManager : MonoBehaviour
     public void ShowPanel(GameObject panelToShow)
     {
         ClearEventFocus();
-        if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
-        if (levelSelectPanel != null) levelSelectPanel.SetActive(false);
-        if (settingsPanel != null) settingsPanel.SetActive(false);
-        if (shopPanel != null) shopPanel.SetActive(false);
+        // 前進 (進入子頁面) 時舊頁面縮小淡出、新頁面由近處縮入；返回主選單則反向，營造空間連貫感
+        bool forward = panelToShow != mainMenuPanel;
+        float outScale = forward ? 0.95f : 1.05f;
+        float inScale = forward ? 1.05f : 0.95f;
+        HidePanelAnimated(mainMenuPanel, panelToShow, outScale);
+        HidePanelAnimated(levelSelectPanel, panelToShow, outScale);
+        HidePanelAnimated(settingsPanel, panelToShow, outScale);
+        HidePanelAnimated(shopPanel, panelToShow, outScale);
 
         if (panelToShow != null)
         {
-            panelToShow.SetActive(true);
+            UIPanelAnimator.Show(panelToShow, inScale);
             currentActivePanel = panelToShow;
         }
 
@@ -1222,13 +1307,26 @@ public class RollingSkyMenuManager : MonoBehaviour
         EnsureAllButtonsTextSafe();
     }
 
+    void HidePanelAnimated(GameObject p, GameObject keep, float outScale)
+    {
+        if (p == null || p == keep || !p.activeSelf) return;
+        UIPanelAnimator.Hide(p, outScale);
+    }
+
+    void SetTabPanel(GameObject p, bool show)
+    {
+        if (p == null) return;
+        if (show) UIPanelAnimator.SwapIn(p); // 已啟用則不重播
+        else p.SetActive(false);
+    }
+
     public void SwitchSettingsTab(int tabIndex)
     {
         ClearEventFocus();
-        if (displaySettingsPanel != null) displaySettingsPanel.SetActive(tabIndex == 0);
-        if (keyboardSettingsPanel != null) keyboardSettingsPanel.SetActive(tabIndex == 1);
-        if (controllerSettingsPanel != null) controllerSettingsPanel.SetActive(tabIndex == 2);
-        if (audioSettingsPanel != null) audioSettingsPanel.SetActive(tabIndex == 3);
+        SetTabPanel(displaySettingsPanel, tabIndex == 0);
+        SetTabPanel(keyboardSettingsPanel, tabIndex == 1);
+        SetTabPanel(controllerSettingsPanel, tabIndex == 2);
+        SetTabPanel(audioSettingsPanel, tabIndex == 3);
 
         Color activeCol = new Color(0f, 0.5f, 0.9f);
         Color normalCol = new Color(0.1f, 0.22f, 0.38f);
@@ -1897,13 +1995,18 @@ public class RollingSkyMenuManager : MonoBehaviour
         if (mainMenuPanel != null)
         {
             mainMenuButtons.Clear();
-            string[] leftBtnNames = new string[] { "Btn_Start", "Btn_Levels", "Btn_Endless", "Btn_SkyTower" };
-            string[] rightBtnNames = new string[] { "Btn_Shop", "Btn_Builder", "Btn_Settings", "Btn_Exit" };
-
-            for (int r = 0; r < leftBtnNames.Length; r++)
-                RegisterAccordionButton(mainMenuPanel, leftBtnNames[r], 0, r, mainMenuButtons, (c, row) => { activeNavCol = c; activeNavRow = row; isMenuNavActive = true; });
-            for (int r = 0; r < rightBtnNames.Length; r++)
-                RegisterAccordionButton(mainMenuPanel, rightBtnNames[r], 1, r, mainMenuButtons, (c, row) => { activeNavCol = c; activeNavRow = row; isMenuNavActive = true; });
+            // 版面：Row 0 = 開始 (單一寬按鈕, 只有 col 0)；Row 1~4 = 2 欄網格 (HandleGroupNavigation 的「右欄無按鈕不移動」防護仍適用於 Row 0)
+            System.Action<int, int> hover = (c, row) => { activeNavCol = c; activeNavRow = row; isMenuNavActive = true; };
+            RegisterAccordionButton(mainMenuPanel, "Btn_Start", 0, 0, mainMenuButtons, hover);
+            RegisterAccordionButton(mainMenuPanel, "Btn_Levels", 0, 1, mainMenuButtons, hover);
+            RegisterAccordionButton(mainMenuPanel, "Btn_Endless", 1, 1, mainMenuButtons, hover);
+            RegisterAccordionButton(mainMenuPanel, "Btn_SkyTower", 0, 2, mainMenuButtons, hover);
+            RegisterAccordionButton(mainMenuPanel, "Btn_Tutorial", 1, 2, mainMenuButtons, hover);
+            RegisterAccordionButton(mainMenuPanel, "Btn_Shop", 0, 3, mainMenuButtons, hover);
+            RegisterAccordionButton(mainMenuPanel, "Btn_Builder", 1, 3, mainMenuButtons, hover);
+            RegisterAccordionButton(mainMenuPanel, "Btn_Settings", 0, 4, mainMenuButtons, hover);
+            RegisterAccordionButton(mainMenuPanel, "Btn_Exit", 1, 4, mainMenuButtons, hover);
+            ApplyNeonHighlight(mainMenuButtons);
         }
 
         // 2. 初始化選擇關卡面板 (10 大挑戰關卡: 左5關、右5關 + 底部返回鍵)
@@ -1918,6 +2021,7 @@ public class RollingSkyMenuManager : MonoBehaviour
                 RegisterAccordionButton(levelSelectPanel, $"Btn_Lvl{i}", 1, i - 6, levelSelectButtons, (c, row) => { activeNavCol = c; activeNavRow = row; isMenuNavActive = true; });
             // 底部返回按鈕 (Row 5)
             RegisterAccordionButton(levelSelectPanel, "Btn_Back", 0, 5, levelSelectButtons, (c, row) => { activeNavCol = 0; activeNavRow = 5; isMenuNavActive = true; });
+            ApplyNeonHighlight(levelSelectButtons);
         }
 
         // 3. 初始化皮膚商店面板 (5 款皮膚卡片 + 底部返回鍵)
@@ -1927,6 +2031,7 @@ public class RollingSkyMenuManager : MonoBehaviour
             for (int i = 0; i < 5; i++)
                 RegisterAccordionButton(shopPanel, $"Btn_Skin_{i}", 0, i, shopButtons, (c, row) => { activeNavCol = 0; activeNavRow = row; isMenuNavActive = true; });
             RegisterAccordionButton(shopPanel, "Btn_ShopBack", 0, 5, shopButtons, (c, row) => { activeNavCol = 0; activeNavRow = 5; isMenuNavActive = true; });
+            ApplyNeonHighlight(shopButtons);
         }
 
         // 4. 初始化系統設定選項按鈕 (頂部 4 大 Tab + 內部調整選項 + 底部三大按鈕)
@@ -2004,6 +2109,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         RegisterAccordionButton(settingsPanel, "Btn_ResetDefaults", 0, SETTINGS_BOTTOM_ROW, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
         RegisterAccordionButton(settingsPanel, "Btn_ResetAllSave", 1, SETTINGS_BOTTOM_ROW, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
         RegisterAccordionButton(settingsPanel, "Btn_SaveBack", 2, SETTINGS_BOTTOM_ROW, activeSettingsButtons, (c, r) => { activeNavCol = c; activeNavRow = r; isMenuNavActive = true; });
+        ApplyNeonHighlight(activeSettingsButtons);
 
         EnsureAllButtonsTextSafe();
     }
@@ -2194,6 +2300,60 @@ public class RollingSkyMenuManager : MonoBehaviour
             if (item.text != null)
                 item.text.color = Color.Lerp(item.text.color, targetTextColor, dt * ANIM_SPEED);
         }
+
+        if (allowPush) UpdateSelectionGlow(buttonList, currentCol, currentRow, dt);
+    }
+
+    // ==================== 滑動選取光暈 (在按鈕之間平滑移動，營造「連貫」的焦點) ====================
+    private Dictionary<Transform, RectTransform> selectionGlows = new Dictionary<Transform, RectTransform>();
+
+    void ApplyNeonHighlight(List<MenuAccordionButton> list)
+    {
+        foreach (var item in list)
+        {
+            item.highlightColor = new Color(0.0f, 0.68f, 0.92f, 1f);
+            item.highlightTextColor = Color.white;
+        }
+    }
+
+    void UpdateSelectionGlow(List<MenuAccordionButton> list, int col, int row, float dt)
+    {
+        MenuAccordionButton sel = isMenuNavActive ? list.Find(b => b.column == col && b.row == row && b.rectTransform != null) : null;
+        // 所有光暈先淡出 (只有選中項所屬面板的光暈會被拉亮)
+        Transform parent = sel != null ? sel.rectTransform.parent : null;
+
+        foreach (var kv in selectionGlows)
+        {
+            if (kv.Value == null || kv.Key == parent) continue;
+            Image fadeImg = kv.Value.GetComponent<Image>();
+            Color fc = fadeImg.color; fc.a = Mathf.Lerp(fc.a, 0f, dt * 12f); fadeImg.color = fc;
+        }
+        if (sel == null || parent == null) return;
+
+        if (!selectionGlows.TryGetValue(parent, out RectTransform glow) || glow == null)
+        {
+            GameObject g = new GameObject("SelectionGlow", typeof(RectTransform), typeof(Image));
+            g.transform.SetParent(parent, false);
+            g.transform.SetAsFirstSibling();
+            glow = g.GetComponent<RectTransform>();
+            glow.anchorMin = glow.anchorMax = new Vector2(0.5f, 0.5f);
+            glow.pivot = new Vector2(0.5f, 0.5f);
+            Image gi0 = g.GetComponent<Image>();
+            gi0.raycastTarget = false;
+            gi0.color = new Color(0.1f, 0.9f, 1f, 0f);
+            glow.anchoredPosition = sel.rectTransform.anchoredPosition;
+            glow.sizeDelta = sel.rectTransform.sizeDelta;
+            selectionGlows[parent] = glow;
+        }
+
+        Vector2 targetPos = sel.rectTransform.anchoredPosition;
+        Vector2 targetSize = Vector2.Scale(sel.rectTransform.sizeDelta, sel.rectTransform.localScale) + new Vector2(30f, 30f);
+        float k = dt * 16f;
+        glow.anchoredPosition = Vector2.Lerp(glow.anchoredPosition, targetPos, k);
+        glow.sizeDelta = Vector2.Lerp(glow.sizeDelta, targetSize, k);
+        Image gi = glow.GetComponent<Image>();
+        float pulse = 0.20f + 0.08f * Mathf.Sin(Time.unscaledTime * 4f);
+        Color gc = gi.color; gc.a = Mathf.Lerp(gc.a, pulse, dt * 12f); gi.color = gc;
     }
 
     void HandleMenuNavigationInput()
@@ -2250,7 +2410,7 @@ public class RollingSkyMenuManager : MonoBehaviour
         // 3. 各面板全域導航派發
         if (mainMenuPanel != null && mainMenuPanel.activeInHierarchy)
         {
-            HandleGroupNavigation(moveUp, moveDown, moveLeft, moveRight, confirm, 2, 4, mainMenuButtons);
+            HandleGroupNavigation(moveUp, moveDown, moveLeft, moveRight, confirm, 2, 5, mainMenuButtons);
         }
         else if (levelSelectPanel != null && levelSelectPanel.activeInHierarchy)
         {
@@ -2416,7 +2576,8 @@ public class RollingSkyMenuManager : MonoBehaviour
             }
             else if (moveRight && maxCols > 1)
             {
-                if (activeNavCol < maxCols - 1)
+                // 右欄該列沒有按鈕 (例如主選單第 5 列僅左欄有「新手教學」) 時不移動
+                if (activeNavCol < maxCols - 1 && group.Exists(b => b.column == activeNavCol + 1 && b.row == activeNavRow))
                 {
                     activeNavCol++;
                     navCooldownTimer = 0.22f;

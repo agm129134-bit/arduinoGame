@@ -28,6 +28,10 @@ public class RollingSkyTrackGenerator : MonoBehaviour
     private List<EndlessChunkEntry> activeChunks = new List<EndlessChunkEntry>();
     private Transform ballTransform;
     private bool isEndlessActive = false;
+    private int endlessChunkCount = 0;
+    // 簡單: 5線道尖刺巡航、金鑽長廊、S彎、鋸齒、單跳台 / 中等再加連跳、孤島、量子斷層、躍崖、雙斷層
+    private static readonly int[] EasyEndlessPool = { 0, 9, 8, 11, 5, 9 };
+    private static readonly int[] MediumEndlessPool = { 0, 9, 8, 11, 5, 7, 12, 10, 1, 2 };
     private GameObject trackRoot;
     private PhysicsMaterial tilePhysicMaterial;
 
@@ -38,6 +42,13 @@ public class RollingSkyTrackGenerator : MonoBehaviour
     {
         Instance = this;
         LoadDefaultMaterials();
+
+        // 無盡模式起跑速度調慢：必須在 BallController.Start 讀取 baseForwardSpeed 之前設定 (Awake 先於所有 Start)
+        if (PlayerPrefs.GetInt("IsEndlessMode", 0) == 1)
+        {
+            RollingSkyBallController b = FindAnyObjectByType<RollingSkyBallController>();
+            if (b != null) b.forwardSpeed = 8.5f;
+        }
     }
 
     void Start()
@@ -238,8 +249,15 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         if (ball != null)
         {
             // 隨關卡逐步提升小球滾動衝刺速度
-            ball.forwardSpeed = 11.0f + (level - 1) * 0.7f;
+            // (二次易化) 7.5 → 10.65 m/s，原為 11.0 → 17.3
+            ball.forwardSpeed = 7.5f + (level - 1) * 0.35f;
         }
+
+        // 尖刺保留比例：每 N 個只放 1 個 (0 = 全部移除)；L1 無尖刺，L7 本身僅 2 個全保留
+        int[] keepEvery = { 0, 0, 3, 3, 2, 2, 2, 1, 2, 2, 2 };
+        hazardKeepEvery = keepEvery[Mathf.Clamp(level, 1, 10)];
+        hazardCounter = 0;
+        int childrenBefore = parent.childCount;
 
         switch (level)
         {
@@ -256,536 +274,477 @@ public class RollingSkyTrackGenerator : MonoBehaviour
             default: BuildLevel_1(parent); break;
         }
 
-        // 各關卡已在 FinishLevelSetup 內依 totalRows 動態設置精準的 gm.trackLength 與 ResetLevelStats
+        // 起跑暖身再加長 10 排 (20m)：整條賽道往前平移，再於起點補一段 5 線道平臺與寶石
+        float shiftZ = EXTRA_WARMUP_ROWS * ROW_LEN;
+        for (int i = childrenBefore; i < parent.childCount; i++)
+        {
+            Transform c = parent.GetChild(i);
+            c.position += new Vector3(0f, 0f, shiftZ);
+        }
+        BuildSection(parent, 0, EXTRA_WARMUP_ROWS, ALL5);
+        GemLine(parent, 0, 3, EXTRA_WARMUP_ROWS, 3);
+        RollingSkyGameManager gmShift = FindAnyObjectByType<RollingSkyGameManager>();
+        if (gmShift != null)
+        {
+            gmShift.trackLength += shiftZ;
+            gmShift.ResetLevelStats();
+        }
+        hazardKeepEvery = 1;
+    }
+
+    // ==================== 難度調整說明 (v1.0 easier pass) ====================
+    // 設計原則：
+    //  - 前進速度 9.0 (L1) → 13.05 (L10)，每關 +0.45；跳台後水平速度即 forwardSpeed (見 BallController.FixedUpdate)
+    //  - 起跑安全區 30 排 (60m)；深淵斷層一律 4~5 排空缺，跳台鋪滿整個來源路段的所有線道
+    //  - 落地後至少 6~12 排寬敞 5 線道平台，且落地後 13 排內不放障礙
+    //  - 5 線道最多 1 個尖刺、3 線道尖刺間隔 ≥ 7 排並留 2 條安全線道
+    //  - 路段結尾與終點平台無縫銜接 (最後路段結束排 = totalRows - 4)
+    static readonly int[] ALL5 = { -2, -1, 0, 1, 2 };
+    static readonly int[] MID3 = { -1, 0, 1 };
+    private const int EXTRA_WARMUP_ROWS = 10;
+    private int hazardKeepEvery = 1;
+    private int hazardCounter = 0;
+
+    void HazardAt(Transform parent, int col, int row)
+    {
+        if (hazardKeepEvery <= 0) return;
+        if ((hazardCounter++ % hazardKeepEvery) != 0) return;
+        CreateHazard(parent, new Vector3(col * COL_WIDTH, 0.5f, row * ROW_LEN));
+    }
+
+    void GemAt(Transform parent, float col, int row)
+    {
+        CreateGem(parent, new Vector3(col * COL_WIDTH, 0, row * ROW_LEN));
+    }
+
+    void GemLine(Transform parent, float col, int fromRow, int toRowExclusive, int step)
+    {
+        for (int r = fromRow; r < toRowExclusive; r += step) GemAt(parent, col, r);
+    }
+
+    // 寬幅跳台：來源路段每一條線道都有跳台，僅中間那一座附帶空中導引寶石
+    void WideGap(Transform parent, int jumpRow, int landingRow, int[] cols)
+    {
+        for (int i = 0; i < cols.Length; i++)
+            CreateJumpOverGap(parent, jumpRow, landingRow, cols[i], 0f, i == cols.Length / 2);
+        // 斷層前緣多補 1 排地磚，縮短實際空洞 (手動跳也更容易過)
+        BuildSection(parent, jumpRow + 1, jumpRow + 2, cols);
     }
 
     // ---------- LEVEL 1 : 霓虹大道 (Neon Avenue) ----------
     void BuildLevel_1(Transform parent)
     {
-        // 總排數 120 (240m)，適合新手入門：熟悉 5 線道與 3 線道切換、跳躍墊越過深淵斷層與手動跳躍
-        BuildSection(parent, 0, 20, new int[] { -2, -1, 0, 1, 2 });
-        for (int r = 4; r <= 16; r += 3)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+        // 總排數 110：長暖身 + 僅 2 處短斷層 + 全程 5 線道、僅 4 個尖刺 (極度寬容)
+        BuildSection(parent, 0, 30, ALL5);
+        GemLine(parent, 0, 4, 29, 4);
 
-        // 第 1 處深淵斷層 (第 20~22 排懸空，第 19 排配置跳台越過斷層)
-        CreateJumpOverGap(parent, 19, 23, 0);
+        WideGap(parent, 29, 34, ALL5);
 
-        // 落地接 3 線道，微幅蛇行寶石與邊緣障礙
-        BuildSection(parent, 23, 42, new int[] { -1, 0, 1 });
-        for (int r = 25; r < 40; r += 3)
+        BuildSection(parent, 34, 58, ALL5);
+        for (int r = 36; r < 56; r += 3)
             CreateGem(parent, new Vector3(Mathf.Sin(r * 0.4f) * COL_WIDTH, 0, r * ROW_LEN));
-        CreateHazard(parent, new Vector3(-COL_WIDTH, 0.5f, 30 * ROW_LEN));
-        CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, 36 * ROW_LEN));
+        HazardAt(parent, -2, 48);
+        HazardAt(parent, 2, 52);
 
-        // 第 2 處深淵斷層 (第 42~47 排懸空，第 41 排配置跳台)
-        CreateJumpOverGap(parent, 41, 48, 0);
+        WideGap(parent, 57, 62, ALL5);
 
-        // 落地接寬敞 5 線道，交錯避障訓練
-        BuildSection(parent, 48, 70, new int[] { -2, -1, 0, 1, 2 });
-        CreateHazard(parent, new Vector3(-COL_WIDTH, 0.5f, 54 * ROW_LEN));
-        CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, 62 * ROW_LEN));
-        CreateGem(parent, new Vector3(COL_WIDTH, 0, 54 * ROW_LEN));
-        CreateGem(parent, new Vector3(-COL_WIDTH, 0, 62 * ROW_LEN));
-
-        // 第 3 處深淵斷層 (第 70~75 排懸空，第 69 排配置跳台)
-        CreateJumpOverGap(parent, 69, 76, 0);
-
-        // 落地接雙分流軌道 (左軌道與右軌道，中間為虛空斷層)
-        BuildSection(parent, 76, 95, new int[] { -2, -1 });
-        BuildSection(parent, 76, 95, new int[] { 1, 2 });
-        for (int r = 78; r < 94; r += 4)
+        BuildSection(parent, 62, 106, ALL5);
+        for (int r = 66; r < 104; r += 4)
         {
-            CreateGem(parent, new Vector3(-1.5f * COL_WIDTH, 0, r * ROW_LEN));
-            CreateGem(parent, new Vector3(1.5f * COL_WIDTH, 0, r * ROW_LEN));
+            GemAt(parent, -1.5f, r);
+            GemAt(parent, 1.5f, r);
         }
+        HazardAt(parent, 0, 82);
+        HazardAt(parent, -2, 96);
 
-        // 匯合回 3 線道衝刺段
-        BuildSection(parent, 95, 114, new int[] { -1, 0, 1 });
-        CreateHazard(parent, new Vector3(0, 0.5f, 100 * ROW_LEN));
-        CreateHazard(parent, new Vector3(-COL_WIDTH, 0.5f, 106 * ROW_LEN));
-        CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, 106 * ROW_LEN));
-        CreateGem(parent, new Vector3(COL_WIDTH, 0, 100 * ROW_LEN));
-        CreateGem(parent, new Vector3(0, 0, 106 * ROW_LEN));
-        CreateGem(parent, new Vector3(0, 0, 110 * ROW_LEN));
-
-        // 終點星門與 100% 精準結算
-        FinishLevelSetup(parent, 120);
+        FinishLevelSetup(parent, 110);
     }
 
     // ---------- LEVEL 2 : 虛空躍升 (Void Leap) ----------
     void BuildLevel_2(Transform parent)
     {
-        // 總排數 135 (270m)：跳躍頻率提高，分流跳台與兩翼寶石
-        BuildSection(parent, 0, 20, new int[] { -2, -1, 0, 1, 2 });
-        for (int r = 4; r <= 16; r += 3)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+        // 總排數 124：3 處斷層，全程 5 線道、尖刺稀疏
+        BuildSection(parent, 0, 28, ALL5);
+        GemLine(parent, 0, 4, 27, 4);
 
-        // 第 1 級深淵彈射
-        CreateJumpOverGap(parent, 19, 27, 0);
+        WideGap(parent, 27, 32, ALL5);
 
-        // 落地接雙子單軌窄橋 (-1 與 +1)，考驗平穩微調
-        BuildSection(parent, 27, 50, new int[] { -1 });
-        BuildSection(parent, 27, 50, new int[] { 1 });
-        for (int r = 29; r < 49; r += 4)
-        {
-            CreateGem(parent, new Vector3(-COL_WIDTH, 0, r * ROW_LEN));
-            CreateGem(parent, new Vector3(COL_WIDTH, 0, r * ROW_LEN));
-        }
+        BuildSection(parent, 32, 56, ALL5);
+        GemLine(parent, -2, 36, 54, 4);
+        GemLine(parent, 2, 38, 54, 4);
+        HazardAt(parent, -2, 44);
+        HazardAt(parent, 2, 52);
 
-        // 第 2 級深淵彈射 (左右雙跳台同步)
-        CreateJumpOverGap(parent, 49, 57, -1);
-        CreateJumpOverGap(parent, 49, 57, 1);
+        WideGap(parent, 55, 60, ALL5);
 
-        // 落地接 3 線道，穿梭避障
-        BuildSection(parent, 57, 80, new int[] { -1, 0, 1 });
-        CreateHazard(parent, new Vector3(-COL_WIDTH, 0.5f, 63 * ROW_LEN));
-        CreateHazard(parent, new Vector3(0, 0.5f, 69 * ROW_LEN));
-        CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, 75 * ROW_LEN));
-        CreateGem(parent, new Vector3(COL_WIDTH, 0, 63 * ROW_LEN));
-        CreateGem(parent, new Vector3(-COL_WIDTH, 0, 69 * ROW_LEN));
-        CreateGem(parent, new Vector3(0, 0, 75 * ROW_LEN));
+        BuildSection(parent, 60, 84, ALL5);
+        GemLine(parent, 0, 64, 82, 4);
+        HazardAt(parent, -1, 70);
+        HazardAt(parent, 1, 78);
 
-        // 第 3 級深淵彈射
-        CreateJumpOverGap(parent, 79, 88, 0);
+        WideGap(parent, 83, 88, ALL5);
 
-        // 偏右 3 線道
-        BuildSection(parent, 88, 110, new int[] { 0, 1, 2 });
-        CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, 95 * ROW_LEN));
-        CreateHazard(parent, new Vector3(2 * COL_WIDTH, 0.5f, 103 * ROW_LEN));
-        CreateGem(parent, new Vector3(0, 0, 95 * ROW_LEN));
-        CreateGem(parent, new Vector3(COL_WIDTH, 0, 103 * ROW_LEN));
+        BuildSection(parent, 88, 120, ALL5);
+        GemLine(parent, 0, 92, 118, 4);
+        HazardAt(parent, 0, 100);
+        HazardAt(parent, 2, 110);
 
-        // 第 4 級深淵彈射
-        CreateJumpOverGap(parent, 109, 117, 1);
-
-        // 落地衝刺段
-        BuildSection(parent, 117, 128, new int[] { -1, 0, 1 });
-        for (int r = 119; r <= 127; r += 3)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-
-        FinishLevelSetup(parent, 135);
+        FinishLevelSetup(parent, 124);
     }
 
     // ---------- LEVEL 3 : 疾速迴旋 (Speed Spiral) ----------
     void BuildLevel_3(Transform parent)
     {
-        // 總排數 150 (300m)：蛇行過彎、切角深淵斷層與跳台變道
-        BuildSection(parent, 0, 20, new int[] { -2, -1, 0, 1, 2 });
-        for (int r = 4; r <= 16; r += 4)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+        // 總排數 136：左偏/右偏 3 線道彎道 (前方有 5 線道緩衝)，尖刺大幅減少
+        BuildSection(parent, 0, 30, ALL5);
+        GemLine(parent, 0, 4, 29, 4);
 
-        // 左偏 3 線道彎道
-        BuildSection(parent, 20, 42, new int[] { -2, -1, 0 });
-        CreateHazard(parent, new Vector3(0, 0.5f, 28 * ROW_LEN));
-        CreateGem(parent, new Vector3(-COL_WIDTH, 0, 28 * ROW_LEN));
-        CreateHazard(parent, new Vector3(-2 * COL_WIDTH, 0.5f, 36 * ROW_LEN));
-        CreateGem(parent, new Vector3(-COL_WIDTH, 0, 36 * ROW_LEN));
+        WideGap(parent, 29, 34, ALL5);
 
-        // 斜向斜跨彈射深淵
-        CreateJumpOverGap(parent, 41, 49, -1);
+        BuildSection(parent, 34, 40, ALL5);
+        BuildSection(parent, 40, 60, new int[] { -2, -1, 0 });
+        HazardAt(parent, 0, 48);
+        GemAt(parent, -1, 48);
+        HazardAt(parent, -2, 56);
+        GemAt(parent, -1, 56);
 
-        // 右偏 3 線道彎道
-        BuildSection(parent, 49, 72, new int[] { 0, 1, 2 });
-        CreateHazard(parent, new Vector3(0, 0.5f, 56 * ROW_LEN));
-        CreateHazard(parent, new Vector3(2 * COL_WIDTH, 0.5f, 64 * ROW_LEN));
-        CreateGem(parent, new Vector3(COL_WIDTH, 0, 56 * ROW_LEN));
-        CreateGem(parent, new Vector3(COL_WIDTH, 0, 64 * ROW_LEN));
+        BuildSection(parent, 60, 66, ALL5);
+        BuildSection(parent, 66, 86, new int[] { 0, 1, 2 });
+        HazardAt(parent, 0, 74);
+        GemAt(parent, 1, 74);
+        HazardAt(parent, 2, 82);
+        GemAt(parent, 1, 82);
 
-        // 彈跳切回中央
-        CreateJumpOverGap(parent, 71, 79, 1);
+        WideGap(parent, 85, 90, new int[] { 0, 1, 2 });
 
-        // 中央 3 線道蛇行避障
-        BuildSection(parent, 79, 105, new int[] { -1, 0, 1 });
-        CreateHazard(parent, new Vector3(-COL_WIDTH, 0.5f, 85 * ROW_LEN));
-        CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, 92 * ROW_LEN));
-        CreateHazard(parent, new Vector3(0, 0.5f, 99 * ROW_LEN));
-        CreateGem(parent, new Vector3(0, 0, 85 * ROW_LEN));
-        CreateGem(parent, new Vector3(0, 0, 92 * ROW_LEN));
-        CreateGem(parent, new Vector3(-COL_WIDTH, 0, 99 * ROW_LEN));
+        BuildSection(parent, 90, 96, ALL5);
+        BuildSection(parent, 96, 114, MID3);
+        HazardAt(parent, -1, 102);
+        GemAt(parent, 0, 102);
+        HazardAt(parent, 1, 108);
+        GemAt(parent, 0, 108);
 
-        // 飛越深淵
-        CreateJumpOverGap(parent, 104, 113, 0);
+        WideGap(parent, 113, 118, MID3);
 
-        // S 彎切換
-        BuildSection(parent, 113, 128, new int[] { -2, -1, 0 });
-        BuildSection(parent, 128, 143, new int[] { 0, 1, 2 });
-        for (int r = 115; r < 140; r += 4)
+        BuildSection(parent, 118, 132, ALL5);
+        for (int r = 120; r < 130; r += 3)
             CreateGem(parent, new Vector3(Mathf.Sin(r * 0.3f) * COL_WIDTH, 0, r * ROW_LEN));
 
-        FinishLevelSetup(parent, 150);
+        FinishLevelSetup(parent, 136);
     }
 
     // ---------- LEVEL 4 : 斷崖連跳 (Chasm Bounce) ----------
     void BuildLevel_4(Transform parent)
     {
-        // 總排數 165 (330m)：連續大跨度彈射深淵與狹窄浮島
-        BuildSection(parent, 0, 20, new int[] { -2, -1, 0, 1, 2 });
+        // 總排數 150：5 連跳 (斷層 5 排空缺)，浮島收窄為 3 線道但前有 5 線道緩衝，尖刺僅 2 個
+        BuildSection(parent, 0, 30, ALL5);
+        GemLine(parent, 0, 4, 29, 4);
 
-        // 第 1 跳
-        CreateJumpOverGap(parent, 19, 28, 0);
-        BuildSection(parent, 28, 40, new int[] { -1, 0, 1 });
-        for (int r = 30; r < 38; r += 2)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+        WideGap(parent, 29, 35, ALL5);
+        BuildSection(parent, 35, 50, ALL5);
+        GemLine(parent, 0, 37, 49, 2);
 
-        // 第 2 跳
-        CreateJumpOverGap(parent, 39, 48, 0);
-        BuildSection(parent, 48, 68, new int[] { -1, 0 }); // 左側雙線窄道
-        CreateHazard(parent, new Vector3(0, 0.5f, 56 * ROW_LEN));
-        CreateGem(parent, new Vector3(-COL_WIDTH, 0, 56 * ROW_LEN));
+        WideGap(parent, 49, 55, ALL5);
+        BuildSection(parent, 55, 61, ALL5);
+        BuildSection(parent, 61, 72, MID3);
+        GemLine(parent, 0, 63, 71, 3);
 
-        // 第 3 跳
-        CreateJumpOverGap(parent, 67, 77, -1);
-        BuildSection(parent, 77, 100, new int[] { 0, 1 }); // 右側雙線窄道
-        CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, 86 * ROW_LEN));
-        CreateGem(parent, new Vector3(0, 0, 86 * ROW_LEN));
+        WideGap(parent, 71, 77, MID3);
+        BuildSection(parent, 77, 83, ALL5);
+        BuildSection(parent, 83, 100, MID3);
+        HazardAt(parent, -1, 92);
+        GemAt(parent, 1, 92);
 
-        // 第 4 跳
-        CreateJumpOverGap(parent, 99, 109, 1);
-        BuildSection(parent, 109, 132, new int[] { -1, 0, 1 });
-        CreateHazard(parent, new Vector3(-COL_WIDTH, 0.5f, 116 * ROW_LEN));
-        CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, 124 * ROW_LEN));
-        CreateGem(parent, new Vector3(0, 0, 120 * ROW_LEN));
+        WideGap(parent, 99, 105, MID3);
+        BuildSection(parent, 105, 111, ALL5);
+        BuildSection(parent, 111, 130, MID3);
+        HazardAt(parent, 1, 120);
+        GemAt(parent, 0, 120);
 
-        // 第 5 跳 (終極大跳躍)
-        CreateJumpOverGap(parent, 131, 142, 0);
-        BuildSection(parent, 142, 158, new int[] { -1, 0, 1 });
-        for (int r = 144; r <= 156; r += 3)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+        WideGap(parent, 129, 135, MID3);
+        BuildSection(parent, 135, 146, ALL5);
+        GemLine(parent, 0, 137, 145, 3);
 
-        FinishLevelSetup(parent, 165);
+        FinishLevelSetup(parent, 150);
     }
 
     // ---------- LEVEL 5 : 迷宮尖刺 (Spike Labyrinth) ----------
     void BuildLevel_5(Transform parent)
     {
-        // 總排數 180 (360m)：高密度尖刺陣列，考驗左右傾角微調操作與穿縫走位
-        BuildSection(parent, 0, 24, new int[] { -2, -1, 0, 1, 2 });
+        // 總排數 168：仍是尖刺主題，但每 5~8 排才 1 個、單排最多 1 個 (原本每 3 排 2 個)
+        BuildSection(parent, 0, 30, ALL5);
+        GemLine(parent, 0, 4, 29, 4);
 
-        // 尖刺迷宮第 1 區
-        BuildSection(parent, 24, 60, new int[] { -2, -1, 0, 1, 2 });
-        for (int r = 26; r < 58; r += 6)
+        // 迷宮第 1 區：5 線道，單一尖刺循環換位
+        BuildSection(parent, 30, 70, ALL5);
+        int[] cyc = { -1, 1, 0, -2, 2, 0 };
+        int idx = 0;
+        for (int r = 36; r < 66; r += 5, idx++)
         {
-            int blocked = ((r / 6) % 2 == 0) ? 1 : -1;
-            CreateHazard(parent, new Vector3(blocked * COL_WIDTH, 0.5f, r * ROW_LEN));
-            CreateHazard(parent, new Vector3(0, 0.5f, (r + 2) * ROW_LEN));
-            CreateGem(parent, new Vector3(-blocked * COL_WIDTH, 0, r * ROW_LEN));
+            int c = cyc[idx % cyc.Length];
+            HazardAt(parent, c, r);
+            GemAt(parent, -c, r);
         }
 
-        // 跳台飛躍迷宮斷層
-        CreateJumpOverGap(parent, 59, 68, 0);
+        WideGap(parent, 69, 75, ALL5);
 
-        // 尖刺迷宮第 2 區 (中央釘刺，需沿邊緣滑行)
-        BuildSection(parent, 68, 105, new int[] { -1, 0, 1 });
-        for (int r = 70; r < 102; r += 5)
+        // 迷宮第 2 區：5 線道緩衝後 3 線道，僅中央釘刺，兩側皆安全
+        BuildSection(parent, 75, 81, ALL5);
+        BuildSection(parent, 81, 110, MID3);
+        for (int r = 88; r < 108; r += 8)
         {
-            CreateHazard(parent, new Vector3(0, 0.5f, r * ROW_LEN));
-            float safeX = ((r / 5) % 2 == 0) ? -COL_WIDTH : COL_WIDTH;
-            CreateGem(parent, new Vector3(safeX, 0, r * ROW_LEN));
+            HazardAt(parent, 0, r);
+            GemAt(parent, (r / 8) % 2 == 0 ? -1 : 1, r);
         }
 
-        // 跳台飛躍
-        CreateJumpOverGap(parent, 104, 114, 0);
+        WideGap(parent, 109, 115, MID3);
 
-        // 尖刺迷宮第 3 區 (密集蛇形陣列)
-        BuildSection(parent, 114, 150, new int[] { -2, -1, 0, 1, 2 });
-        for (int r = 116; r < 146; r += 6)
+        // 迷宮第 3 區：5 線道，每 6 排 1 個尖刺
+        BuildSection(parent, 115, 150, ALL5);
+        idx = 0;
+        for (int r = 126; r < 146; r += 6, idx++)
         {
-            float side = ((r / 6) % 2 == 0) ? -1.5f : 1.5f;
-            CreateHazard(parent, new Vector3(side * COL_WIDTH, 0.5f, r * ROW_LEN));
-            CreateGem(parent, new Vector3(-side * COL_WIDTH * 0.7f, 0, r * ROW_LEN));
+            int c = cyc[(idx + 2) % cyc.Length];
+            HazardAt(parent, c, r);
+            GemAt(parent, -c, r);
         }
 
-        CreateJumpOverGap(parent, 149, 159, 0);
+        WideGap(parent, 149, 155, ALL5);
 
-        // 衝刺收尾
-        BuildSection(parent, 159, 173, new int[] { -1, 0, 1 });
-        for (int r = 161; r <= 170; r += 3)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+        BuildSection(parent, 155, 164, ALL5);
+        GemLine(parent, 0, 158, 164, 3);
 
-        FinishLevelSetup(parent, 180);
+        FinishLevelSetup(parent, 168);
     }
 
     // ---------- LEVEL 6 : 升降律動 (Piston Pulse) ----------
     void BuildLevel_6(Transform parent)
     {
-        // 總排數 195 (390m)：深淵連環大跳躍與全平面平滑衝刺 (全關卡統一 0f 高度，消除著陸階梯落差小跳)
-        BuildSection(parent, 0, 25, new int[] { -2, -1, 0, 1, 2 });
+        // 總排數 180：4 道連環大跳；障礙減為每路段 2~3 個，全程有 2 條以上安全線道
+        BuildSection(parent, 0, 30, ALL5);
+        GemLine(parent, 0, 4, 29, 4);
 
-        // 第 1 段深淵彈射：飛越第 25~31 排深淵
-        CreateJumpOverGap(parent, 24, 32, 0);
+        WideGap(parent, 29, 35, ALL5);
+        BuildSection(parent, 35, 41, ALL5);
+        BuildSection(parent, 41, 66, MID3);
+        GemLine(parent, 0, 43, 65, 4);
+        HazardAt(parent, -1, 50);
+        HazardAt(parent, 1, 60);
 
-        // 第 1 區 3 線道，懸浮寶石與左右障礙
-        BuildSection(parent, 32, 60, new int[] { -1, 0, 1 });
-        for (int r = 34; r < 58; r += 4)
-        {
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-            if (r % 8 == 0) CreateHazard(parent, new Vector3(-COL_WIDTH, 0.5f, r * ROW_LEN));
-        }
+        WideGap(parent, 65, 71, MID3);
+        BuildSection(parent, 71, 77, ALL5);
+        BuildSection(parent, 77, 102, MID3);
+        GemLine(parent, 0, 79, 101, 4);
+        HazardAt(parent, 1, 86);
+        HazardAt(parent, -1, 96);
 
-        // 第 2 段深淵彈射：飛越第 60~67 排深淵
-        CreateJumpOverGap(parent, 59, 68, 0);
+        WideGap(parent, 101, 107, MID3);
+        BuildSection(parent, 107, 140, ALL5);
+        GemLine(parent, 0, 110, 138, 5);
+        HazardAt(parent, -2, 118);
+        HazardAt(parent, 2, 125);
+        HazardAt(parent, -1, 132);
 
-        // 第 2 區 3 線道
-        BuildSection(parent, 68, 100, new int[] { -1, 0, 1 });
-        for (int r = 70; r < 98; r += 4)
-        {
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-            if (r % 8 == 4) CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, r * ROW_LEN));
-        }
+        WideGap(parent, 139, 145, ALL5);
+        BuildSection(parent, 145, 176, ALL5);
+        GemLine(parent, 0, 148, 174, 4);
 
-        // 第 3 段大跳躍：飛越第 100~108 排深淵
-        CreateJumpOverGap(parent, 99, 109, 0);
-
-        // 地面平台恢復衝刺
-        BuildSection(parent, 109, 145, new int[] { -1, 0, 1 });
-        for (int r = 112; r < 142; r += 5)
-        {
-            CreateHazard(parent, new Vector3(((r % 2 == 0) ? -COL_WIDTH : COL_WIDTH), 0.5f, r * ROW_LEN));
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-        }
-
-        // 終曲跳躍
-        CreateJumpOverGap(parent, 144, 155, 0);
-        BuildSection(parent, 155, 187, new int[] { -2, -1, 0, 1, 2 });
-        for (int r = 158; r <= 182; r += 4)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-
-        FinishLevelSetup(parent, 195);
+        FinishLevelSetup(parent, 180);
     }
 
     // ---------- LEVEL 7 : 浮島穿梭 (Floating Islands) ----------
     void BuildLevel_7(Transform parent)
     {
-        // 總排數 210 (420m)：浮空群島接力跳躍
-        BuildSection(parent, 0, 22, new int[] { -2, -1, 0, 1, 2 });
+        // 總排數 202：島嶼接力；每座島先有 8 排 5 線道落地緩衝，窄橋放寬為 3 線道，尖刺僅 2 個
+        BuildSection(parent, 0, 28, ALL5);
+        GemLine(parent, 0, 4, 27, 4);
 
-        // 島嶼 1 -> 島嶼 2 (偏左)
-        CreateJumpOverGap(parent, 21, 30, 0);
-        BuildSection(parent, 30, 52, new int[] { -2, -1, 0 });
-        for (int r = 32; r < 50; r += 3)
-            CreateGem(parent, new Vector3(-COL_WIDTH, 0, r * ROW_LEN));
+        WideGap(parent, 27, 33, ALL5);
+        BuildSection(parent, 33, 41, ALL5);
+        BuildSection(parent, 41, 59, new int[] { -2, -1, 0 });
+        GemLine(parent, -1, 43, 58, 3);
 
-        // 島嶼 2 -> 島嶼 3 (偏右)
-        CreateJumpOverGap(parent, 51, 60, -1);
-        BuildSection(parent, 60, 82, new int[] { 0, 1, 2 });
-        for (int r = 62; r < 80; r += 3)
-            CreateGem(parent, new Vector3(COL_WIDTH, 0, r * ROW_LEN));
+        WideGap(parent, 58, 64, new int[] { -2, -1, 0 });
+        BuildSection(parent, 64, 72, ALL5);
+        BuildSection(parent, 72, 90, new int[] { 0, 1, 2 });
+        GemLine(parent, 1, 74, 89, 3);
 
-        // 島嶼 3 -> 島嶼 4 (中央窄橋)
-        CreateJumpOverGap(parent, 81, 90, 1);
-        BuildSection(parent, 90, 112, new int[] { -1, 0 });
-        CreateHazard(parent, new Vector3(0, 0.5f, 100 * ROW_LEN));
-        CreateGem(parent, new Vector3(-COL_WIDTH, 0, 100 * ROW_LEN));
+        WideGap(parent, 89, 95, new int[] { 0, 1, 2 });
+        BuildSection(parent, 95, 103, ALL5);
+        BuildSection(parent, 103, 121, MID3);
+        HazardAt(parent, 0, 112);
+        GemAt(parent, -1, 112);
 
-        // 島嶼 4 -> 島嶼 5 (右側窄橋)
-        CreateJumpOverGap(parent, 111, 120, -1);
-        BuildSection(parent, 120, 142, new int[] { 0, 1 });
-        CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, 130 * ROW_LEN));
-        CreateGem(parent, new Vector3(0, 0, 130 * ROW_LEN));
+        WideGap(parent, 120, 126, MID3);
+        BuildSection(parent, 126, 134, ALL5);
+        BuildSection(parent, 134, 152, new int[] { 0, 1, 2 });
+        HazardAt(parent, 1, 142);
+        GemAt(parent, 0, 142);
 
-        // 島嶼 5 -> 島嶼 6 (大跳躍至主大陸)
-        CreateJumpOverGap(parent, 141, 152, 0);
-        BuildSection(parent, 152, 176, new int[] { -1, 0, 1 });
-        for (int r = 154; r < 174; r += 4)
+        WideGap(parent, 151, 157, new int[] { 0, 1, 2 });
+        BuildSection(parent, 157, 175, ALL5);
+        for (int r = 159; r < 173; r += 4)
             CreateGem(parent, new Vector3(Mathf.Sin(r) * COL_WIDTH, 0, r * ROW_LEN));
 
-        // 最後一道彈跳
-        CreateJumpOverGap(parent, 175, 185, 0);
-        BuildSection(parent, 185, 202, new int[] { -2, -1, 0, 1, 2 });
+        WideGap(parent, 174, 180, ALL5);
+        BuildSection(parent, 180, 198, ALL5);
+        GemLine(parent, 0, 183, 197, 3);
 
-        FinishLevelSetup(parent, 210);
+        FinishLevelSetup(parent, 202);
     }
 
     // ---------- LEVEL 8 : 重力逆襲 (Gravity Shift) ----------
     void BuildLevel_8(Transform parent)
     {
-        // 總排數 225 (450m)：雙峽谷分流、深淵對決與高難度急轉
-        BuildSection(parent, 0, 25, new int[] { -2, -1, 0, 1, 2 });
+        // 總排數 218：雙峽谷縮短、峽谷內無尖刺；其餘路段尖刺每 7 排 1 個
+        BuildSection(parent, 0, 30, ALL5);
+        GemLine(parent, 0, 4, 29, 4);
 
-        // 第 1 級彈射
-        CreateJumpOverGap(parent, 24, 33, 0);
+        WideGap(parent, 29, 35, ALL5);
+        BuildSection(parent, 35, 47, ALL5);
 
-        // 雙子深谷分流 (左峽谷 -2, -1 / 右峽谷 1, 2，中間虛空)
-        BuildSection(parent, 33, 66, new int[] { -2, -1 });
-        BuildSection(parent, 33, 66, new int[] { 1, 2 });
-        for (int r = 36; r < 64; r += 4)
+        // 雙子峽谷 (22 排，無障礙，邊緣有寶石導引)
+        int[] canyonL = { -2, -1 };
+        int[] canyonR = { 1, 2 };
+        BuildSection(parent, 47, 69, canyonL);
+        BuildSection(parent, 47, 69, canyonR);
+        for (int r = 50; r < 68; r += 4)
         {
-            CreateGem(parent, new Vector3(-1.5f * COL_WIDTH, 0, r * ROW_LEN));
-            CreateGem(parent, new Vector3(1.5f * COL_WIDTH, 0, r * ROW_LEN));
-            if (r % 8 == 0)
-            {
-                CreateHazard(parent, new Vector3(-2 * COL_WIDTH, 0.5f, r * ROW_LEN));
-                CreateHazard(parent, new Vector3(2 * COL_WIDTH, 0.5f, r * ROW_LEN));
-            }
+            GemAt(parent, -1.5f, r);
+            GemAt(parent, 1.5f, r);
         }
 
-        // 雙子峽谷同步越崖跳台
-        CreateJumpOverGap(parent, 65, 74, -1);
-        CreateJumpOverGap(parent, 65, 74, 1);
+        WideGap(parent, 68, 74, new int[] { -2, -1, 1, 2 });
 
-        // 匯合至蛇行 3 線道
-        BuildSection(parent, 74, 110, new int[] { -1, 0, 1 });
-        for (int r = 76; r < 108; r += 5)
+        BuildSection(parent, 74, 110, ALL5);
+        for (int r = 86; r < 108; r += 7)
         {
-            float hx = (r % 2 == 0) ? -COL_WIDTH : COL_WIDTH;
-            CreateHazard(parent, new Vector3(hx, 0.5f, r * ROW_LEN));
-            CreateGem(parent, new Vector3(-hx, 0, r * ROW_LEN));
+            int hx = ((r / 7) % 2 == 0) ? -1 : 1;
+            HazardAt(parent, hx, r);
+            GemAt(parent, -hx, r);
         }
 
-        // 第 3 級深淵彈射
-        CreateJumpOverGap(parent, 109, 119, 0);
+        WideGap(parent, 109, 115, ALL5);
+        BuildSection(parent, 115, 127, ALL5);
+        BuildSection(parent, 127, 150, new int[] { -2, -1, 0 });
+        GemLine(parent, -1, 129, 149, 4);
 
-        // 左偏窄橋
-        BuildSection(parent, 119, 155, new int[] { -2, -1, 0 });
-        for (int r = 122; r < 152; r += 4)
-            CreateGem(parent, new Vector3(-COL_WIDTH, 0, r * ROW_LEN));
+        WideGap(parent, 149, 155, new int[] { -2, -1, 0 });
+        BuildSection(parent, 155, 167, ALL5);
+        BuildSection(parent, 167, 190, new int[] { 0, 1, 2 });
+        GemLine(parent, 1, 169, 189, 4);
 
-        // 第 4 級深淵彈射
-        CreateJumpOverGap(parent, 154, 164, -1);
+        WideGap(parent, 189, 195, new int[] { 0, 1, 2 });
+        BuildSection(parent, 195, 214, ALL5);
+        GemLine(parent, 0, 198, 213, 3);
 
-        // 右偏窄橋
-        BuildSection(parent, 164, 192, new int[] { 0, 1, 2 });
-        for (int r = 166; r < 190; r += 4)
-            CreateGem(parent, new Vector3(COL_WIDTH, 0, r * ROW_LEN));
-
-        // 第 5 級深淵彈射至終點衝刺區
-        CreateJumpOverGap(parent, 191, 201, 1);
-        BuildSection(parent, 201, 218, new int[] { -2, -1, 0, 1, 2 });
-
-        FinishLevelSetup(parent, 225);
+        FinishLevelSetup(parent, 218);
     }
 
     // ---------- LEVEL 9 : 混沌風暴 (Chaos Vortex) ----------
     void BuildLevel_9(Transform parent)
     {
-        // 總排數 240 (480m)：單格獨木橋鋼索 + 連續深淵彈射 + 極速避障
-        BuildSection(parent, 0, 25, new int[] { -2, -1, 0, 1, 2 });
+        // 總排數 238：單格鋼絲橋縮短為 12 排且前後有 5 線道緩衝；其餘 3~5 線道、尖刺間隔 ≥ 6 排
+        BuildSection(parent, 0, 30, ALL5);
+        GemLine(parent, 0, 4, 29, 4);
 
-        // 第 1 跳
-        CreateJumpOverGap(parent, 24, 33, 0);
+        WideGap(parent, 29, 35, ALL5);
+        BuildSection(parent, 35, 47, ALL5);
+        BuildSection(parent, 47, 59, MID3);           // 窄橋 1 (12 排，原單線道)
+        GemLine(parent, 0, 49, 58, 3);
+        BuildSection(parent, 59, 81, ALL5);
+        HazardAt(parent, -1, 66);
+        HazardAt(parent, 1, 73);
+        GemLine(parent, 0, 62, 80, 4);
 
-        // 第 1 段單格鋼絲橋 (只有 center col 0)
-        BuildSection(parent, 33, 58, new int[] { 0 });
-        for (int r = 35; r < 56; r += 3)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+        WideGap(parent, 80, 86, ALL5);
+        BuildSection(parent, 86, 98, ALL5);
+        BuildSection(parent, 98, 114, MID3);
+        HazardAt(parent, -1, 104);
+        HazardAt(parent, 1, 110);
+        GemAt(parent, 0, 104);
+        GemAt(parent, 0, 110);
 
-        // 第 2 跳
-        CreateJumpOverGap(parent, 57, 66, 0);
+        WideGap(parent, 113, 119, MID3);
+        BuildSection(parent, 119, 131, ALL5);
+        BuildSection(parent, 131, 143, MID3);         // 窄橋 2 (12 排，原單線道)
+        GemLine(parent, 0, 133, 142, 3);
+        BuildSection(parent, 143, 149, ALL5);
+        BuildSection(parent, 149, 168, MID3);
+        HazardAt(parent, 0, 158);
+        GemAt(parent, -1, 158);
 
-        // 3 線道密集障礙
-        BuildSection(parent, 66, 96, new int[] { -1, 0, 1 });
-        for (int r = 68; r < 94; r += 4)
-        {
-            float side = (r % 2 == 0) ? -COL_WIDTH : COL_WIDTH;
-            CreateHazard(parent, new Vector3(side, 0.5f, r * ROW_LEN));
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-        }
+        WideGap(parent, 167, 173, MID3);
+        BuildSection(parent, 173, 185, ALL5);
+        BuildSection(parent, 185, 214, ALL5);
+        HazardAt(parent, -1, 192);
+        HazardAt(parent, 1, 199);
+        HazardAt(parent, 0, 206);
+        GemLine(parent, 0, 188, 212, 4);
 
-        // 第 3 跳
-        CreateJumpOverGap(parent, 95, 105, 0);
+        WideGap(parent, 213, 219, ALL5);
+        BuildSection(parent, 219, 234, ALL5);
+        GemLine(parent, 0, 222, 234, 3);
 
-        // 第 2 段單格鋼絲橋
-        BuildSection(parent, 105, 132, new int[] { 0 });
-        for (int r = 107; r < 130; r += 3)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-
-        // 第 4 跳
-        CreateJumpOverGap(parent, 131, 140, 0);
-
-        // 雙線窄橋
-        BuildSection(parent, 140, 175, new int[] { -1, 0 });
-        for (int r = 142; r < 172; r += 5)
-        {
-            CreateHazard(parent, new Vector3(0, 0.5f, r * ROW_LEN));
-            CreateGem(parent, new Vector3(-COL_WIDTH, 0, r * ROW_LEN));
-        }
-
-        // 第 5 跳
-        CreateJumpOverGap(parent, 174, 184, -1);
-
-        // 衝刺回歸 3 線道
-        BuildSection(parent, 184, 212, new int[] { -1, 0, 1 });
-        for (int r = 186; r < 210; r += 4)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-
-        // 第 6 跳
-        CreateJumpOverGap(parent, 211, 220, 0);
-        BuildSection(parent, 220, 233, new int[] { -2, -1, 0, 1, 2 });
-
-        FinishLevelSetup(parent, 240);
+        FinishLevelSetup(parent, 238);
     }
 
     // ---------- LEVEL 10 : 終極躍動 (Apex Transcendence) ----------
     void BuildLevel_10(Transform parent)
     {
-        // 總排數 260 (520m) 史詩高難度終章：全機關大集結 (鋼索、多層垂直跳台、雙峽谷、全速衝刺)
-        BuildSection(parent, 0, 28, new int[] { -2, -1, 0, 1, 2 });
-        for (int r = 4; r <= 24; r += 4)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
+        // 總排數 250：仍集結所有機關 (3 線道、雙峽谷、鋼絲橋、連續大跳)，但尖刺稀疏、緩衝平台加長
+        BuildSection(parent, 0, 30, ALL5);
+        GemLine(parent, 0, 4, 29, 4);
 
-        // 階段 1：大彈射飛越首道深淵
-        CreateJumpOverGap(parent, 27, 37, 0);
+        WideGap(parent, 29, 35, ALL5);
+        BuildSection(parent, 35, 41, ALL5);
+        BuildSection(parent, 41, 65, MID3);
+        GemLine(parent, 0, 43, 64, 4);
+        HazardAt(parent, -1, 52);
+        HazardAt(parent, 1, 60);
 
-        // 階段 2：衝刺 3 線道 (全關卡統一 0f 高度，消除著陸階梯落差小跳)
-        BuildSection(parent, 37, 65, new int[] { -1, 0, 1 });
-        for (int r = 39; r < 63; r += 4)
+        WideGap(parent, 64, 70, MID3);
+        BuildSection(parent, 70, 100, ALL5);
+        GemLine(parent, 0, 74, 98, 4);
+        HazardAt(parent, 1, 88);
+        HazardAt(parent, -1, 95);
+
+        WideGap(parent, 99, 105, ALL5);
+        BuildSection(parent, 105, 115, ALL5);
+
+        // 雙子峽谷
+        BuildSection(parent, 115, 139, new int[] { -2, -1 });
+        BuildSection(parent, 115, 139, new int[] { 1, 2 });
+        for (int r = 118; r < 138; r += 4)
         {
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-            if (r % 8 == 0) CreateHazard(parent, new Vector3(-COL_WIDTH, 0.5f, r * ROW_LEN));
+            GemAt(parent, -1.5f, r);
+            GemAt(parent, 1.5f, r);
         }
 
-        // 階段 3：大跳躍
-        CreateJumpOverGap(parent, 64, 74, 0);
-        BuildSection(parent, 74, 105, new int[] { -1, 0, 1 });
-        for (int r = 76; r < 103; r += 4)
+        WideGap(parent, 138, 144, new int[] { -2, -1, 1, 2 });
+        BuildSection(parent, 144, 154, ALL5);
+        BuildSection(parent, 154, 168, MID3);         // 窄橋 (14 排，原單線道)
+        GemLine(parent, 0, 156, 167, 3);
+        BuildSection(parent, 168, 186, ALL5);
+        HazardAt(parent, -2, 176);
+
+        WideGap(parent, 185, 191, ALL5);
+        BuildSection(parent, 191, 203, ALL5);
+        BuildSection(parent, 203, 226, MID3);
+        HazardAt(parent, -1, 208);
+        HazardAt(parent, 1, 215);
+        HazardAt(parent, 0, 221);
+        GemLine(parent, 0, 205, 224, 4);
+
+        WideGap(parent, 225, 231, MID3);
+        BuildSection(parent, 231, 246, ALL5);
+        for (int r = 233; r <= 245; r += 2)
         {
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-            if (r % 8 == 4) CreateHazard(parent, new Vector3(COL_WIDTH, 0.5f, r * ROW_LEN));
+            GemAt(parent, -1, r);
+            GemAt(parent, 1, r);
         }
 
-        // 階段 4：大跳躍
-        CreateJumpOverGap(parent, 104, 114, 0);
-
-        // 階段 5：雙子峽谷分流 (-2, -1 與 1, 2)
-        BuildSection(parent, 114, 146, new int[] { -2, -1 });
-        BuildSection(parent, 114, 146, new int[] { 1, 2 });
-        for (int r = 116; r < 144; r += 4)
-        {
-            CreateGem(parent, new Vector3(-1.5f * COL_WIDTH, 0, r * ROW_LEN));
-            CreateGem(parent, new Vector3(1.5f * COL_WIDTH, 0, r * ROW_LEN));
-        }
-
-        // 階段 6：雙峽谷大躍升
-        CreateJumpOverGap(parent, 145, 155, -1);
-        CreateJumpOverGap(parent, 145, 155, 1);
-
-        // 階段 7：極速單格鋼絲橋
-        BuildSection(parent, 155, 185, new int[] { 0 });
-        for (int r = 157; r < 183; r += 3)
-            CreateGem(parent, new Vector3(0, 0, r * ROW_LEN));
-
-        // 階段 8：鋼索盡頭大飛越
-        CreateJumpOverGap(parent, 184, 194, 0);
-
-        // 階段 9：終曲 3 線道密集避障陣列
-        BuildSection(parent, 194, 226, new int[] { -1, 0, 1 });
-        for (int r = 196; r < 224; r += 4)
-        {
-            float side = ((r / 4) % 2 == 0) ? -COL_WIDTH : COL_WIDTH;
-            CreateHazard(parent, new Vector3(side, 0.5f, r * ROW_LEN));
-            CreateGem(parent, new Vector3(-side, 0, r * ROW_LEN));
-        }
-
-        // 階段 10：終極壯麗大跳躍直衝星門
-        CreateJumpOverGap(parent, 225, 236, 0);
-        BuildSection(parent, 236, 252, new int[] { -2, -1, 0, 1, 2 });
-        for (int r = 238; r <= 250; r += 2)
-        {
-            CreateGem(parent, new Vector3(-COL_WIDTH, 0, r * ROW_LEN));
-            CreateGem(parent, new Vector3(COL_WIDTH, 0, r * ROW_LEN));
-        }
-
-        FinishLevelSetup(parent, 260);
+        FinishLevelSetup(parent, 250);
     }
 
     // ==================== 無盡模式 (Endless Mode - 保證連續可通行生成系統) ====================
@@ -800,13 +759,15 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         // 初始前導安全跑道 (長度 40m，共 20 排，5 線道全通)
         GameObject startChunk = new GameObject("Endless_StartChunk");
         startChunk.transform.SetParent(root.transform);
-        BuildSection(startChunk.transform, 0, 20, new int[] { -2, -1, 0, 1, 2 });
-        for (int z = 8; z < 36; z += 6)
+        // (易化版) 起跑安全區加長為 30 排 (60m)
+        endlessChunkCount = 0;
+        BuildSection(startChunk.transform, 0, 30, new int[] { -2, -1, 0, 1, 2 });
+        for (int z = 8; z < 56; z += 6)
         {
-            CreateGem(startChunk.transform, new Vector3(0, 0.8f, z));
+            CreateAirborneGem(startChunk.transform, new Vector3(0, 1.15f, z));
         }
-        currentFarthestZ = 40.0f;
-        activeChunks.Add(new EndlessChunkEntry { go = startChunk, startZ = 0f, endZ = 40.0f });
+        currentFarthestZ = 60.0f;
+        activeChunks.Add(new EndlessChunkEntry { go = startChunk, startZ = 0f, endZ = 60.0f });
 
         // 預先生成前方 6 個區塊，使起跑時前方恆定維持 240 米以上連續跑道
         for (int i = 0; i < 6; i++)
@@ -843,18 +804,26 @@ public class RollingSkyTrackGenerator : MonoBehaviour
             return res;
         }
 
-        int chunkType = Random.Range(0, 14);
+        // (易化版) 無盡模式前期只出簡單區塊，逐步開放全部 14 種
+        int chunkType;
+        if (endlessChunkCount < 14)
+            chunkType = EasyEndlessPool[Random.Range(0, EasyEndlessPool.Length)];
+        else if (endlessChunkCount < 28)
+            chunkType = MediumEndlessPool[Random.Range(0, MediumEndlessPool.Length)];
+        else
+            chunkType = Random.Range(0, 14);
+        endlessChunkCount++;
 
         switch (chunkType)
         {
             case 0: // 【霓虹高速巡航大道】寬敞 5 線道衝刺，交錯單側尖刺與高亮金鑽 (動態隨機障礙)
                 BuildSection(chunk.transform, startRow, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
-                for (int r = startRow + 2; r < startRow + rowsInChunk - 2; r += 4)
+                for (int r = startRow + 3; r < startRow + rowsInChunk - 2; r += 6) // 原每 4 排 → 每 6 排
                 {
                     int spikeCol = (Random.value > 0.5f) ? M_Col(-1) : M_Col(1);
                     if (Random.value > 0.6f) spikeCol = (spikeCol == -1) ? M_Col(-2) : M_Col(2);
                     CreateHazard(chunk.transform, new Vector3(spikeCol * COL_WIDTH, 0.5f, r * ROW_LEN));
-                    CreateGem(chunk.transform, new Vector3(M(0f), 0.95f, (r + 2) * ROW_LEN));
+                    CreateAirborneGem(chunk.transform, new Vector3(M(0f), 1.15f, (r + 2) * ROW_LEN));
                 }
                 break;
 
@@ -870,7 +839,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                 float[] arcH1 = new float[] { 2.4f, 3.8f, 4.8f, 3.8f, 2.4f };
                 for (int h = 0; h < arcH1.Length; h++)
                 {
-                    CreateGem(chunk.transform, new Vector3(0, arcH1[h], (pRow1 + 1 + h) * ROW_LEN));
+                    CreateAirborneGem(chunk.transform, new Vector3(0, arcH1[h], (pRow1 + 1 + h) * ROW_LEN));
                 }
                 // 斷層深淵 (pRow1+1 至 pRow1+5 完全懸空)，著陸平台自第 10 排開始！
                 BuildSection(chunk.transform, startRow + 10, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
@@ -878,26 +847,26 @@ public class RollingSkyTrackGenerator : MonoBehaviour
 
             case 2: // 【雙重手動跳躍斷層】考驗空白鍵精準起跳！兩處 4 米虛空斷崖，金鑽懸於裂口正上方導引
                 BuildSection(chunk.transform, startRow, startRow + 5, MCols(new int[] { -1, 0, 1 }));
-                CreateGem(chunk.transform, new Vector3(0, 1.4f, (startRow + 5.5f) * ROW_LEN)); // 1 號斷層導引金鑽
+                CreateAirborneGem(chunk.transform, new Vector3(0, 2.4f, (startRow + 5.5f) * ROW_LEN)); // 1 號斷層導引金鑽
                 // 裂口：第 5, 6 排為 4 米深淵斷層
                 BuildSection(chunk.transform, startRow + 7, startRow + 12, MCols(new int[] { -1, 0, 1 }));
-                CreateGem(chunk.transform, new Vector3(0, 1.4f, (startRow + 12.5f) * ROW_LEN)); // 2 號斷層導引金鑽
+                CreateAirborneGem(chunk.transform, new Vector3(0, 2.4f, (startRow + 12.5f) * ROW_LEN)); // 2 號斷層導引金鑽
                 // 裂口：第 12, 13 排為 4 米深淵斷層
                 BuildSection(chunk.transform, startRow + 14, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 break;
 
             case 3: // 【虛空浮石連續斷層群】交替孤島飛躍！左右穿梭跳台，考驗搖桿/左右鍵靈敏變道
                 BuildSection(chunk.transform, startRow, startRow + 3, MCols(new int[] { -2, -1 }));
-                CreateGem(chunk.transform, new Vector3(M(-1.5f * COL_WIDTH), 0.95f, (startRow + 1) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(-1.5f * COL_WIDTH), 1.15f, (startRow + 1) * ROW_LEN));
                 // 第 3 排為斷層
                 BuildSection(chunk.transform, startRow + 4, startRow + 7, MCols(new int[] { 1, 2 }));
-                CreateGem(chunk.transform, new Vector3(M(1.5f * COL_WIDTH), 0.95f, (startRow + 5) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(1.5f * COL_WIDTH), 1.15f, (startRow + 5) * ROW_LEN));
                 // 第 7 排為斷層
                 BuildSection(chunk.transform, startRow + 8, startRow + 11, MCols(new int[] { -1, 0, 1 }));
-                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 9) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(0, 1.15f, (startRow + 9) * ROW_LEN));
                 // 第 11 排為斷層
                 BuildSection(chunk.transform, startRow + 12, startRow + 15, MCols(new int[] { -2, -1 }));
-                CreateGem(chunk.transform, new Vector3(M(-1.5f * COL_WIDTH), 0.95f, (startRow + 13) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(-1.5f * COL_WIDTH), 1.15f, (startRow + 13) * ROW_LEN));
                 // 第 15 排為斷層
                 BuildSection(chunk.transform, startRow + 16, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 break;
@@ -909,7 +878,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                 BuildSection(chunk.transform, startRow + 3, startRow + 16, new int[] { bridgeCol });
                 for (int r = startRow + 4; r < startRow + 16; r += 3)
                 {
-                    CreateGem(chunk.transform, new Vector3(bridgeCol * COL_WIDTH, 0.95f, r * ROW_LEN));
+                    CreateAirborneGem(chunk.transform, new Vector3(bridgeCol * COL_WIDTH, 1.15f, r * ROW_LEN));
                 }
                 BuildSection(chunk.transform, startRow + 16, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 break;
@@ -926,12 +895,12 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                 BuildSection(chunk.transform, startRow, startRow + 3, new int[] { -2, -1, 0, 1, 2 });
                 // 中央 3 線道鏤空，僅留左右外側
                 BuildSection(chunk.transform, startRow + 3, startRow + 16, new int[] { -2, 2 });
-                CreateGem(chunk.transform, new Vector3(-COL_WIDTH * 2, 0.95f, (startRow + 6) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(-COL_WIDTH * 2, 1.15f, (startRow + 6) * ROW_LEN));
                 CreateHazard(chunk.transform, new Vector3(-COL_WIDTH * 2, 0.5f, (startRow + 10) * ROW_LEN));
                 CreateHazard(chunk.transform, new Vector3(COL_WIDTH * 2, 0.5f, (startRow + 6) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(COL_WIDTH * 2, 0.95f, (startRow + 10) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(COL_WIDTH * 2, 1.15f, (startRow + 10) * ROW_LEN));
                 BuildSection(chunk.transform, startRow + 16, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
-                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 18) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(0, 1.15f, (startRow + 18) * ROW_LEN));
                 break;
 
             case 7: // 【連環雙重彈射深淵】兩段式連續空中大跳躍！爽快感翻倍
@@ -959,20 +928,20 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                     {
                         if (c >= -2 && c <= 2) CreateSingleTile(chunk.transform, c, r);
                     }
-                    if (i % 3 == 0) CreateGem(chunk.transform, new Vector3(centerCol * COL_WIDTH, 0.95f, r * ROW_LEN));
+                    if (i % 3 == 0) CreateAirborneGem(chunk.transform, new Vector3(centerCol * COL_WIDTH, 1.15f, r * ROW_LEN));
                 }
                 break;
 
             case 9: // 【金鑽狂歡長廊】無障礙大獎勵！高密度金光閃閃鑽石陣列
                 BuildSection(chunk.transform, startRow, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
-                CreateGem(chunk.transform, new Vector3(M(-COL_WIDTH), 0.95f, (startRow + 3) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(M(COL_WIDTH), 0.95f, (startRow + 3) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 6) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(M(-COL_WIDTH * 1.5f), 0.95f, (startRow + 10) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(M(COL_WIDTH * 1.5f), 0.95f, (startRow + 10) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(0, 0.95f, (startRow + 14) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(M(-COL_WIDTH), 0.95f, (startRow + 17) * ROW_LEN));
-                CreateGem(chunk.transform, new Vector3(M(COL_WIDTH), 0.95f, (startRow + 17) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(-COL_WIDTH), 1.15f, (startRow + 3) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(COL_WIDTH), 1.15f, (startRow + 3) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(0, 1.15f, (startRow + 6) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(-COL_WIDTH * 1.5f), 1.15f, (startRow + 10) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(COL_WIDTH * 1.5f), 1.15f, (startRow + 10) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(0, 1.15f, (startRow + 14) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(-COL_WIDTH), 1.15f, (startRow + 17) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(COL_WIDTH), 1.15f, (startRow + 17) * ROW_LEN));
                 break;
 
             case 10: // 【全新 10：量子交錯斷層帶】左右交替雙線道穿梭，中段深淵跳台飛越
@@ -980,17 +949,17 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                 CreateHazard(chunk.transform, new Vector3(M(-COL_WIDTH * 2), 0.5f, (startRow + 2) * ROW_LEN));
                 CreateJumpOverGap(chunk.transform, startRow + 3, startRow + 8, M_Col(-1));
                 BuildSection(chunk.transform, startRow + 8, startRow + 13, MCols(new int[] { 0, 1, 2 }));
-                CreateGem(chunk.transform, new Vector3(M(COL_WIDTH * 1.5f), 0.95f, (startRow + 10) * ROW_LEN));
+                CreateAirborneGem(chunk.transform, new Vector3(M(COL_WIDTH * 1.5f), 1.15f, (startRow + 10) * ROW_LEN));
                 BuildSection(chunk.transform, startRow + 13, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
                 break;
 
             case 11: // 【全新 11：疾速鋸齒穿梭峽谷】交錯尖刺陣列，考驗左右蛇行反應與防側風抗干擾
                 BuildSection(chunk.transform, startRow, startRow + rowsInChunk, new int[] { -2, -1, 0, 1, 2 });
-                for (int i = 2; i < rowsInChunk - 2; i += 3)
+                for (int i = 3; i < rowsInChunk - 2; i += 5) // 原每 3 排 → 每 5 排
                 {
                     int sCol = (i % 2 == 0) ? M_Col(-1) : M_Col(1);
                     CreateHazard(chunk.transform, new Vector3(sCol * COL_WIDTH, 0.5f, (startRow + i) * ROW_LEN));
-                    CreateGem(chunk.transform, new Vector3(-sCol * COL_WIDTH, 0.95f, (startRow + i) * ROW_LEN));
+                    CreateAirborneGem(chunk.transform, new Vector3(-sCol * COL_WIDTH, 1.15f, (startRow + i) * ROW_LEN));
                 }
                 break;
 
@@ -1019,7 +988,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
                     }
                     if (i % 4 == 0)
                     {
-                        CreateGem(chunk.transform, new Vector3(M((i % 2 == 0) ? -COL_WIDTH : COL_WIDTH), 0.95f, r * ROW_LEN));
+                        CreateAirborneGem(chunk.transform, new Vector3(M((i % 2 == 0) ? -COL_WIDTH : COL_WIDTH), 1.15f, r * ROW_LEN));
                     }
                 }
                 break;
@@ -1183,7 +1152,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         gem.AddComponent<GemCollectible>();
     }
 
-    void CreateJumpOverGap(Transform parent, int jumpRow, int landingRow, int col, float height = 0f)
+    void CreateJumpOverGap(Transform parent, int jumpRow, int landingRow, int col, float height = 0f, bool withGems = true)
     {
         int deltaRows = landingRow - jumpRow;
         // 計算精準彈射力量：配合 forwardSpeed = 12m/s (每秒 6 排)
@@ -1202,6 +1171,7 @@ public class RollingSkyTrackGenerator : MonoBehaviour
         float q1Z = (jumpRow + (deltaRows * 0.25f)) * ROW_LEN;
         float q3Z = (jumpRow + (deltaRows * 0.75f)) * ROW_LEN;
 
+        if (!withGems) return;
         CreateAirborneGem(parent, new Vector3(col * COL_WIDTH, height + (apexY - height) * 0.7f, q1Z));
         CreateAirborneGem(parent, new Vector3(col * COL_WIDTH, apexY, midZ));
         CreateAirborneGem(parent, new Vector3(col * COL_WIDTH, height + (apexY - height) * 0.7f, q3Z));

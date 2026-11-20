@@ -441,8 +441,8 @@ public class TrackBuilderManager : MonoBehaviour
         bObj.transform.position = new Vector3(firstCol * COL_WIDTH, 1.2f, firstRow * ROW_LEN);
         bObj.AddComponent<Rigidbody>();
         testBall = bObj.AddComponent<RollingSkyBallController>();
-        testBall.enableSway = true;
-        testBall.swayIntensity = 2.4f;
+        testBall.enableSway = false;
+        testBall.swayIntensity = 0f;
 
         // 啟用攝影機跟隨小球
         if (mainCamera != null)

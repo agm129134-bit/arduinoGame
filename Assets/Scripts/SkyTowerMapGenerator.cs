@@ -31,10 +31,10 @@ public class SkyTowerMapGenerator : MonoBehaviour
     private Vector3 lastPathPos;
     private Vector3 lastPathSize;
     private bool hasLastPath = false;
-    private const float BridgeStoneSize = 4.0f;
+    private const float BridgeStoneSize = 4.6f;
     private const float BridgeStoneThickness = 0.45f;
-    private const float BridgeMaxGap = 2.5f;
-    private const float BridgeMaxRise = 2.4f;
+    private const float BridgeMaxGap = 2.0f;
+    private const float BridgeMaxRise = 2.0f;
 
     void Awake()
     {
@@ -164,6 +164,42 @@ public class SkyTowerMapGenerator : MonoBehaviour
         CreatePillar(new Vector3(7f, 3.5f, 7f), 0.5f, 7f, matZone1_Dawn, hub.transform);
     }
 
+    // ==================== 難度調整 (easier pass) ====================
+    // 主路徑統一：躍升 ≤ 2.1m (原 2.65m)、平臺邊距 ≤ 1.5m (原最大 4.2m)、平臺邊長 ≥ 5.0m；
+    // 墊腳石 (BridgeMax*) 同步收緊為 邊距 ≤ 2.0m / 躍升 ≤ 2.0m；移動平臺只剩 1 座且極慢；
+    // 尖刺大幅減少；環形路段外緣加低矮護欄 (僅在外緣與行進方向垂直時才放，絕不擋路)。
+
+    // 在平臺外緣加低矮護欄：外向方向貼近 X 或 Z 軸 (±25°) 時才放，確保不會擋住前後平臺的進出路線
+    void AddOuterRail(Vector3 platPos, Vector3 platSize, Vector3 ringCenter, Material mat, Transform parent)
+    {
+        Vector3 outward = new Vector3(platPos.x - ringCenter.x, 0f, platPos.z - ringCenter.z);
+        float len = outward.magnitude;
+        if (len < 0.01f) return;
+        outward /= len;
+
+        bool alongX = Mathf.Abs(outward.x) >= Mathf.Abs(outward.z);
+        float dominant = Mathf.Max(Mathf.Abs(outward.x), Mathf.Abs(outward.z));
+        if (dominant < 0.9f) return;
+
+        const float railH = 0.9f;
+        const float railT = 0.25f;
+        Vector3 railPos;
+        Vector3 railSize;
+        if (alongX)
+        {
+            float sx = Mathf.Sign(outward.x);
+            railPos = new Vector3(platPos.x + sx * (platSize.x * 0.5f - railT * 0.5f), platPos.y + platSize.y * 0.5f + railH * 0.5f, platPos.z);
+            railSize = new Vector3(railT, railH, platSize.z);
+        }
+        else
+        {
+            float sz = Mathf.Sign(outward.z);
+            railPos = new Vector3(platPos.x, platPos.y + platSize.y * 0.5f + railH * 0.5f, platPos.z + sz * (platSize.z * 0.5f - railT * 0.5f));
+            railSize = new Vector3(platSize.x, railH, railT);
+        }
+        CreatePlatform(railPos, railSize, mat, parent, "GuardRail");
+    }
+
     // ==================== 1. Zone 1: 0m - 50m 晨曦起點 ====================
     void BuildZone1_DawnAscent(Transform parent)
     {
@@ -173,13 +209,12 @@ public class SkyTowerMapGenerator : MonoBehaviour
         int steps = 25;
         for (int i = 0; i < steps; i++)
         {
-            float y = 2.0f + i * 1.95f; // 升至約 49m
-            float x = Mathf.Sin(i * 0.35f) * 6.5f;
-            float z = 8.0f + i * 4.6f; // 步進 4.6m，徹底消除相鄰階梯前後重疊
+            float y = 2.0f + i * 1.95f; // 升至約 49m (躍升 1.95m)
+            float x = Mathf.Sin(i * 0.35f) * 5.0f; // 左右擺幅 6.5 → 5.0m，換邊更緩
+            float z = 8.0f + i * 4.6f;
 
             Vector3 pos = new Vector3(x, y, z);
-            // 平臺全面加寬至 4.8m~6.5m 大方磚，跳躍更寬容
-            Vector3 size = (i == 12 || i == steps - 1) ? new Vector3(6.5f, 0.45f, 6.5f) : new Vector3(4.8f, 0.45f, 4.8f);
+            Vector3 size = (i % 6 == 0 || i == steps - 1) ? new Vector3(7.0f, 0.45f, 7.0f) : new Vector3(5.6f, 0.45f, 5.6f);
 
             CreatePathPlatform(pos, size, matZone1_Dawn, zone.transform, $"Z1_Step_{i}");
 
@@ -193,27 +228,22 @@ public class SkyTowerMapGenerator : MonoBehaviour
         GameObject zone = new GameObject("Zone2_NeonPipes (50-120m)");
         zone.transform.SetParent(parent);
 
-        int steps = 28;
-        float startZ = 8.0f + 25 * 4.6f; // 銜接 Zone 1 終點 (~123m)
+        int steps = 36;                       // 28 → 36 階，躍升 2.45 → 1.9m
+        float startZ = 8.0f + 25 * 4.6f;      // 銜接 Zone 1 終點 (~123m)，Zone 1 的 z 步進未變
 
         for (int i = 0; i < steps; i++)
         {
-            float y = 51.5f + i * 2.45f; // 升至約 118m
-            // 沿全新 X 側翼延伸展開，徹底遠離 Zone 1 上空，杜絕垂直重疊夾角
-            float x = 12.0f + Mathf.Cos(i * 0.32f) * 7.5f;
-            float z = startZ + i * 4.8f; // 恆定向前推進，無任何回頭重疊
+            float y = 51.5f + i * 1.9f;       // 升至約 118m
+            float x = 12.0f + Mathf.Cos(i * 0.25f) * 6.0f; // 頻率隨階數縮放、擺幅 7.5 → 6.0m
+            float z = startZ + i * 3.73f;     // 總前進距離與原本相同
 
             Vector3 pos = new Vector3(x, y, z);
-            Vector3 size = (i % 5 == 0) ? new Vector3(6.5f, 0.45f, 6.5f) : new Vector3(4.8f, 0.45f, 4.8f);
+            Vector3 size = (i % 6 == 0) ? new Vector3(7.0f, 0.45f, 7.0f) : new Vector3(5.6f, 0.45f, 5.6f);
 
-            // i == 0：與 Zone 1 終點相距 7.45m，自動補墊腳石銜接
+            // i == 0：與 Zone 1 終點相距遠，自動補墊腳石銜接
             CreatePathPlatform(pos, size, matZone2_Neon, zone.transform, $"Z2_Pipe_{i}", i == 0);
 
-            // 關鍵跳台 (前進跳躍躍升)
-            if (i == 10 || i == 22)
-            {
-                CreateJumpPad(pos + Vector3.up * 0.3f, 13.0f, zone.transform);
-            }
+            // 原本 2 座垂直彈跳墊會把球彈離路徑，易化版移除
 
             if (i % 4 == 1) CreateGem(pos + Vector3.up * 1.4f, zone.transform);
         }
@@ -229,37 +259,32 @@ public class SkyTowerMapGenerator : MonoBehaviour
         Vector3 coreCenter = new Vector3(12f, 170f, 260f);
         CreatePillar(coreCenter, 3.5f, 110f, matZone3_Spiral, zone.transform, "CentralEnergyPillar");
 
-        int steps = 38;
-        float radius = 16.0f; // 大幅擴展螺旋半徑至 16m，階梯水平周長充足
-        // 起始角 235°：第一階正好落在 Zone 2 終點 (x≈6.7, z≈252.6) 旁 (邊距 0.9m、躍升 2.35m)，
-        // 原本 0° 起點與 Zone 2 終點相距 16.7m 完全跳不到
+        int steps = 47;                  // 38 → 47 階，躍升 2.65 → 2.1m
+        float radius = 16.0f;
         const float startAngleDeg = 235.0f;
+        const float stepAngleDeg = 16.0f; // 20° → 16°：相鄰平臺緊貼無缺口 (終點角度與原設計相近)
+        Vector3 ringCenter = new Vector3(coreCenter.x, 0f, coreCenter.z);
 
         for (int i = 0; i < steps; i++)
         {
-            float y = 120.0f + i * 2.65f; // 升至約 218m，垂直淨空大幅提高
-            float angle = (startAngleDeg + i * 20.0f) * Mathf.Deg2Rad; // 每圈需 18 階，跨圈垂直落差達 47m，徹底杜絕跨層上下重疊卡死
+            float y = 120.0f + i * 2.1f;  // 升至約 217m
+            float angle = (startAngleDeg + i * stepAngleDeg) * Mathf.Deg2Rad;
             float x = coreCenter.x + Mathf.Cos(angle) * radius;
             float z = coreCenter.z + Mathf.Sin(angle) * radius;
 
             Vector3 pos = new Vector3(x, y, z);
-            Vector3 size = new Vector3(4.8f, 0.45f, 4.8f); // 平臺擴大至 4.8m 寬敞大板塊
+            Vector3 size = new Vector3(5.2f, 0.45f, 5.2f);
 
             GameObject plat = CreatePathPlatform(pos, size, matZone3_Spiral, zone.transform, $"Z3_SpiralStep_{i}", i == 0);
+            AddOuterRail(pos, size, ringCenter, matZone3_Spiral, zone.transform);
 
-            // 平緩水平漂移浮島
-            if (i == 14 || i == 26)
+            // 只保留 1 座極慢小幅漂移浮島 (最大速度約 0.8 m/s、幅度 1.2m)，原為 2 座
+            if (i == 24)
             {
                 SkyTowerMovingPlatform mover = plat.AddComponent<SkyTowerMovingPlatform>();
                 mover.moveDirection = new Vector3(-Mathf.Sin(angle), 0, Mathf.Cos(angle));
-                mover.moveDistance = 2.0f;
-                mover.moveSpeed = 1.0f;
-            }
-
-            // 垂直跳躍台
-            if (i == 32)
-            {
-                CreateJumpPad(pos + Vector3.up * 0.3f, 13.5f, zone.transform);
+                mover.moveDistance = 1.2f;
+                mover.moveSpeed = 0.7f;
             }
 
             if (i % 4 == 0) CreateGem(pos + Vector3.up * 1.4f, zone.transform);
@@ -272,18 +297,17 @@ public class SkyTowerMapGenerator : MonoBehaviour
         GameObject zone = new GameObject("Zone4_NarrowRidges (220-320m)");
         zone.transform.SetParent(parent);
 
-        // 每階 9m 水平間距 (邊距 4.2m)，躍升由 2.75m 降至 2.45m 以保留安全餘裕，階數 36 → 41 維持同樣總高度
-        int steps = 41;
-        float squareSize = 36.0f; // 迴廊外框大幅加寬至 36m
+        // 外框 36 → 28m：每階水平間距 9 → 7m、平臺 5.6m，邊距僅 1.4m (原 4.2m)；躍升 2.45 → 1.75m，階數 41 → 57
+        int steps = 57;
+        float squareSize = 28.0f;
         Vector3 zoneCenter = new Vector3(12f, 0f, 260f);
-        // 方框起點相位 3/16：起點靠近 Zone 3 終點 (x≈7.9, z≈244.6)，終點 (第 40 階) 落在北側 (3, 278) 正對 Zone 5 起點
+        // 相位 3：起點靠近 Zone 3 終點；第 56 階落在北側 (5, 274) 正對 Zone 5 起點 (連線不穿過中央巨柱)
         const int phaseOffset = 3;
 
         for (int i = 0; i < steps; i++)
         {
-            float y = 221.5f + i * 2.45f; // 升至約 319.5m
+            float y = 221.5f + i * 1.75f; // 升至約 319.5m
 
-            // 沿著高空寬闊外廓方框行進
             float t = ((i + phaseOffset) % 16) / 16.0f;
             float x = 0f, z = 0f;
 
@@ -309,15 +333,16 @@ public class SkyTowerMapGenerator : MonoBehaviour
             }
 
             Vector3 pos = zoneCenter + new Vector3(x, y, z);
-            // 由原先 1.6m 極窄懸崖全面加寬至 4.8m 寬敞安全平臺！
-            Vector3 size = (i == 18) ? new Vector3(7.0f, 0.5f, 7.0f) : new Vector3(4.8f, 0.45f, 4.8f);
+            Vector3 size = (i % 12 == 6) ? new Vector3(7.0f, 0.5f, 7.0f) : new Vector3(5.6f, 0.45f, 5.6f);
 
             CreatePathPlatform(pos, size, matZone4_Hazard, zone.transform, $"Z4_Ridge_{i}", i == 0);
+            AddOuterRail(pos, size, zoneCenter, matZone4_Hazard, zone.transform);
 
-            // 尖刺機關障礙 (放置於角落邊緣，留出足夠安全通道供 Arduino 平滑通過)
-            if (i % 6 == 3 && i != 18)
+            // 尖刺：原每 6 階 1 個 → 每 12 階 1 個，縮小並貼近外緣 (內側仍有 ≥ 3.5m 通道)
+            if (i % 12 == 3)
             {
-                CreateHazard(pos + new Vector3(1.6f, 0.35f, 0), new Vector3(1.2f, 0.4f, 1.2f), zone.transform);
+                Vector3 outward = new Vector3(x, 0f, z).normalized;
+                CreateHazard(pos + outward * 1.7f + new Vector3(0f, 0.35f, 0f), new Vector3(1.0f, 0.4f, 1.0f), zone.transform);
             }
 
             if (i % 4 == 2) CreateGem(pos + Vector3.up * 1.4f, zone.transform);
@@ -330,29 +355,30 @@ public class SkyTowerMapGenerator : MonoBehaviour
         GameObject zone = new GameObject("Zone5_CloudMaze (320-430m)");
         zone.transform.SetParent(parent);
 
-        // 躍升由 2.95m 降至 2.65m (原值已逼近 3.6m 物理極限)，階數 36 → 40 維持同樣總高度
-        int steps = 40;
+        // 40 → 52 階，躍升 2.65 → 2.0m；橢圓放大 (X 5→6.5、Z 9→11) 且頻率隨階數縮放，使相鄰平臺水平間距維持約 3m、不垂直疊壓
+        int steps = 52;
         Vector3 baseCenter = new Vector3(12f, 0f, 260f);
+        Vector3 ringCenter = new Vector3(baseCenter.x - 8.5f, 0f, baseCenter.z);
 
         for (int i = 0; i < steps; i++)
         {
-            float y = 322.0f + i * 2.65f; // 升至約 425m
+            float y = 322.0f + i * 2.0f; // 升至約 424m
 
-            // 寬敞雙分岔攀登路線：全面擴大平臺至 5.0m
-            // X/Z 同頻率 (0.45) 走橢圓：原本 Z 用 0.35 會在第 17→18 階幾乎垂直疊在正上方 (水平位移僅 0.49m)，球被上一階天花板封死
-            float xLeft = baseCenter.x - 8.5f + Mathf.Sin(i * 0.45f) * 5.0f;
-            float zLeft = baseCenter.z + Mathf.Cos(i * 0.45f) * 9.0f;
+            float xLeft = baseCenter.x - 8.5f + Mathf.Sin(i * 0.346f) * 6.5f;
+            float zLeft = baseCenter.z + Mathf.Cos(i * 0.346f) * 11.0f;
 
             Vector3 posL = new Vector3(xLeft, y, zLeft);
-            CreatePathPlatform(posL, new Vector3(5.0f, 0.45f, 5.0f), matZone5_Cosmic, zone.transform, $"Z5_MainPath_{i}", i == 0);
+            Vector3 sizeL = new Vector3(5.4f, 0.45f, 5.4f);
+            CreatePathPlatform(posL, sizeL, matZone5_Cosmic, zone.transform, $"Z5_MainPath_{i}", i == 0);
+            AddOuterRail(posL, sizeL, ringCenter, matZone5_Cosmic, zone.transform);
 
-            // 右側捷徑
-            if (i % 4 == 0)
+            // 右側選用捷徑 (原每 4 階 → 每 8 階)，非主路徑，僅供加速
+            if (i % 8 == 0)
             {
                 float xRight = baseCenter.x + 9.5f + Mathf.Cos(i * 0.45f) * 4.5f;
                 float zRight = baseCenter.z + Mathf.Sin(i * 0.35f) * 8.0f;
                 Vector3 posR = new Vector3(xRight, y, zRight);
-                CreatePlatform(posR, new Vector3(4.8f, 0.45f, 4.8f), matZone5_Cosmic, zone.transform, $"Z5_ShortPath_{i}");
+                CreatePlatform(posR, new Vector3(5.2f, 0.45f, 5.2f), matZone5_Cosmic, zone.transform, $"Z5_ShortPath_{i}");
                 CreateJumpPad(posR + Vector3.up * 0.3f, 13.5f, zone.transform);
             }
 
@@ -369,23 +395,23 @@ public class SkyTowerMapGenerator : MonoBehaviour
         GameObject zone = new GameObject("Zone6_ApexShrine (430-500m)");
         zone.transform.SetParent(parent);
 
-        // 黃金寬闊階梯直通天界
-        // 原設計半徑由 16m 收縮到 3m，最後幾階鑽到 20x20m 神殿平臺正下方 (頭頂淨空僅 2.4m、需再爬 4.39m)，終點永遠到不了。
-        // 改為固定半徑 16m 環繞神殿外圍、躍升 2.65m、27 階：最後一階 (y≈499.9) 位於神殿北緣外 0.97m，只需再上 0.35m 即可登頂
-        int steps = 27;
+        // 半徑 16m 環繞神殿外圍；27 → 35 階、躍升 2.65 → 2.02m、每階 16.9°，最後一階 (y≈499.7) 緊鄰神殿北緣外 (約 0.5m)
+        int steps = 35;
         Vector3 apexTowerCenter = new Vector3(12f, 0f, 260f);
 
         for (int i = 0; i < steps; i++)
         {
-            float y = 431.0f + i * 2.65f; // 升至約 500m
+            float y = 431.0f + i * 2.02f;
             float radius = 16f;
-            float angle = i * 22f * Mathf.Deg2Rad;
+            float angle = i * 16.9f * Mathf.Deg2Rad;
 
             float x = apexTowerCenter.x + Mathf.Sin(angle) * radius;
             float z = apexTowerCenter.z - Mathf.Cos(angle) * radius;
 
             Vector3 pos = new Vector3(x, y, z);
-            CreatePathPlatform(pos, new Vector3(5.2f, 0.5f, 5.2f), matZone6_Apex, zone.transform, $"Z6_GoldenStair_{i}", i == 0);
+            Vector3 size = new Vector3(5.6f, 0.5f, 5.6f);
+            CreatePathPlatform(pos, size, matZone6_Apex, zone.transform, $"Z6_GoldenStair_{i}", i == 0);
+            AddOuterRail(pos, size, apexTowerCenter, matZone6_Apex, zone.transform);
 
             if (i % 3 == 0) CreateGem(pos + Vector3.up * 1.5f, zone.transform);
         }

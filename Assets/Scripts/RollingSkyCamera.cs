@@ -24,6 +24,21 @@ public class RollingSkyCamera : MonoBehaviour
     private float currentX;
     private ArduinoReceiver arduino;
 
+    // ---- Arduino 搖桿視角 (自動校準) ----
+    // 原本寫死中位 500 + 單純 /500 正規化：實體搖桿靜止值常落在 480~540 (甚至更偏)，造成相機持續漂移或單向轉不動；
+    // 且靈敏度 220°/s x cameraSensitivity(2.0) = 440°/s 太躁、曲線近乎線性 → 微調不易；Camera_Sensitivity 只在 Awake 讀一次。
+    private Vector2 joyCenter = new Vector2(512f, 512f);
+    private bool joyCalibrated = false;
+    private Vector2 joyLastRaw;
+    private float joyStableTime = 0f;
+    private Vector2 joySmoothed = Vector2.zero;
+    private float sensRefreshTimer = 0f;
+    private const float JoyDeadzone = 0.07f;      // 正規化死區 (約 ±35 單位)
+    private const float JoyCurveExponent = 1.4f;  // 指數曲線：小幅微調細膩、推到底仍有速度
+    private const float JoyYawSpeed = 200f;       // 全推水平角速度 (度/秒，cameraSensitivity=2.0 時)
+    private const float JoyPitchSpeed = 110f;     // 全推垂直角速度
+    private const float JoySmoothRate = 28f;      // 一階低通 (時間常數約 36ms)，平滑但幾乎無延遲
+
     public Vector3 CameraForwardXZ
     {
         get
@@ -87,6 +102,69 @@ public class RollingSkyCamera : MonoBehaviour
         transform.LookAt(lookTarget);
     }
 
+    void UpdateJoystickCamera()
+    {
+        // 定期重讀設定 (設定選單調整 Camera_Sensitivity 後即時生效)
+        sensRefreshTimer -= Time.unscaledDeltaTime;
+        if (sensRefreshTimer <= 0f)
+        {
+            sensRefreshTimer = 0.5f;
+            ReloadSettings();
+        }
+
+        if (arduino == null || !arduino.IsConnected)
+        {
+            joyCalibrated = false;
+            joySmoothed = Vector2.zero;
+            return;
+        }
+
+        Vector2 raw = arduino.joystick;
+        if (raw.x < 0f || raw.x > 1023f || raw.y < 0f || raw.y > 1023f) return; // 雜訊/異常封包
+
+        // 首次取樣：若接近中央 (350~674) 就當作靜止中位，否則用理論中位 512
+        if (!joyCalibrated)
+        {
+            bool nearCenter = raw.x > 350f && raw.x < 674f && raw.y > 350f && raw.y < 674f;
+            joyCenter = nearCenter ? raw : new Vector2(512f, 512f);
+            joyCalibrated = true;
+            joyLastRaw = raw;
+            joyStableTime = 0f;
+        }
+
+        // 閒置自動校準：搖桿靜止 (抖動 < 6) 超過 0.8 秒且離中位 < 150，緩慢把中位貼近目前讀值
+        float dt = Time.unscaledDeltaTime;
+        bool still = Mathf.Abs(raw.x - joyLastRaw.x) < 6f && Mathf.Abs(raw.y - joyLastRaw.y) < 6f;
+        joyLastRaw = raw;
+        joyStableTime = still ? joyStableTime + dt : 0f;
+        if (joyStableTime > 0.8f && Mathf.Abs(raw.x - joyCenter.x) < 150f && Mathf.Abs(raw.y - joyCenter.y) < 150f)
+        {
+            joyCenter = Vector2.Lerp(joyCenter, raw, 1f - Mathf.Exp(-3f * dt));
+        }
+
+        Vector2 target = new Vector2(NormalizeJoyAxis(raw.x, joyCenter.x), NormalizeJoyAxis(raw.y, joyCenter.y));
+        float smooth = 1f - Mathf.Exp(-JoySmoothRate * dt);
+        joySmoothed = Vector2.Lerp(joySmoothed, target, smooth);
+
+        // cameraSensitivity 預設 2.0 為基準 (scale = 1)
+        float scale = Mathf.Max(0.1f, cameraSensitivity) / 2.0f;
+        float gameDt = Time.deltaTime;
+        yaw += joySmoothed.x * JoyYawSpeed * scale * gameDt;
+        pitch -= joySmoothed.y * JoyPitchSpeed * scale * gameDt;
+    }
+
+    // 以校準中位正規化到 -1~1：全推判定在可用行程的 85% (實體搖桿常推不到 0/1023)，死區後套指數曲線
+    static float NormalizeJoyAxis(float value, float center)
+    {
+        float d = value - center;
+        float span = (d >= 0f ? (1023f - center) : center) * 0.85f;
+        float n = Mathf.Clamp(d / Mathf.Max(span, 1f), -1f, 1f);
+        float a = Mathf.Abs(n);
+        if (a <= JoyDeadzone) return 0f;
+        a = (a - JoyDeadzone) / (1f - JoyDeadzone);
+        return Mathf.Sign(n) * Mathf.Pow(a, JoyCurveExponent);
+    }
+
     void HandleSkyTowerCamera()
     {
         // 遊戲暫停 (ESC 選單打開) 時不接受旋轉輸入
@@ -108,29 +186,9 @@ public class RollingSkyCamera : MonoBehaviour
                 }
             }
 
-            // 2. Arduino 雙軸實體搖桿視角控制 (中位值約 500，全面重構靈敏度與平滑非線性曲線)
+            // 2. Arduino 雙軸實體搖桿視角控制：自動校準中位 + 小死區 + 指數曲線 + 低延遲平滑 + 套用 Camera_Sensitivity
             if (arduino == null) arduino = FindAnyObjectByType<ArduinoReceiver>();
-            if (arduino != null)
-            {
-                float joyX = (arduino.joystick.x - 500f) / 500f;
-                float joyY = (arduino.joystick.y - 500f) / 500f;
-                const float joyDeadzone = 0.08f; // 縮小死區，提升微調靈敏度
-
-                if (Mathf.Abs(joyX) > joyDeadzone)
-                {
-                    float sign = Mathf.Sign(joyX);
-                    float normX = (Mathf.Abs(joyX) - joyDeadzone) / (1.0f - joyDeadzone);
-                    // Yaw 水平環繞旋轉角速度自 90f 顯著提升至 220f，加入非線性加速曲線
-                    yaw += sign * Mathf.Pow(normX, 1.15f) * cameraSensitivity * 220f * Time.deltaTime;
-                }
-                if (Mathf.Abs(joyY) > joyDeadzone)
-                {
-                    float sign = Mathf.Sign(joyY);
-                    float normY = (Mathf.Abs(joyY) - joyDeadzone) / (1.0f - joyDeadzone);
-                    // Pitch 垂直俯仰角速度自 70f 提升至 160f
-                    pitch -= sign * Mathf.Pow(normY, 1.15f) * cameraSensitivity * 160f * Time.deltaTime;
-                }
-            }
+            UpdateJoystickCamera();
 
             // 3. 鍵盤 Q / E 視角快速旋轉輔助
             float keyTurn = 0f;

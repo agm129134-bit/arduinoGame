@@ -19,8 +19,8 @@ public class RollingSkyBallController : MonoBehaviour
     public float tiltDeadzone = 0.04f;
 
     [Header("Balance Drift / Sway Settings (一般關卡與無盡模式自然左右偏移難度)")]
-    public bool enableSway = true;
-    public float swayIntensity = 2.4f;
+    public bool enableSway = false;
+    public float swayIntensity = 0f;
     public float swayFrequency = 2.4f;
     private float currentSwayForce = 0f;
     public float CurrentSwayForce => currentSwayForce;
@@ -108,32 +108,9 @@ public class RollingSkyBallController : MonoBehaviour
         horizontalSpeed = PlayerPrefs.GetFloat("Keyboard_Speed", 9.0f);
         tiltSensitivity = PlayerPrefs.GetFloat("Tilt_Sensitivity", 2.6f);
         tiltDeadzone = PlayerPrefs.GetFloat("Tilt_Deadzone", 0.04f);
-        enableSway = (PlayerPrefs.GetInt("Sway_Enabled", 1) == 1);
-
-        int selectedLevel = PlayerPrefs.GetInt("SelectedLevel", 1);
-        bool isBuilder = (PlayerPrefs.GetInt("IsBuilderMode", 0) == 1);
-        bool isEndless = (PlayerPrefs.GetInt("IsEndlessMode", 0) == 1);
-        bool isSkyTower = (PlayerPrefs.GetInt("IsSkyTowerMode", 0) == 1);
-
-        if (isBuilder)
-        {
-            // 自訂地圖模式也加入左右偏移幅度 (標準 2.4f)
-            swayIntensity = 2.4f;
-        }
-        else if (isEndless)
-        {
-            swayIntensity = PlayerPrefs.GetFloat("Sway_Intensity", 2.6f);
-        }
-        else if (!isSkyTower)
-        {
-            // 一般關卡 1~10 關幅度越來越大，第 1 關使用現在這幅度 (2.4f)，後續逐級遞增
-            int lvl = Mathf.Clamp(selectedLevel, 1, 10);
-            swayIntensity = 2.4f + (lvl - 1) * 0.22f;
-        }
-        else
-        {
-            swayIntensity = 0f;
-        }
+        // 自動左右飄移 (Sway) 已停用：一律關閉且強度為 0 (欄位保留以維持場景序列化)
+        enableSway = false;
+        swayIntensity = 0f;
     }
 
     /// <summary>
@@ -193,16 +170,10 @@ public class RollingSkyBallController : MonoBehaviour
         // 綁定動態霓虹軌跡拖尾 (TrailRenderer)
         TrailRenderer tr = GetComponent<TrailRenderer>();
         if (tr == null) tr = gameObject.AddComponent<TrailRenderer>();
-        tr.time = 0.35f;
-        tr.startWidth = 0.6f;
-        tr.endWidth = 0.05f;
-        tr.material = mat;
-        Gradient grad = new Gradient();
-        grad.SetKeys(
-            new GradientColorKey[] { new GradientColorKey(themeColor, 0.0f), new GradientColorKey(Color.white, 1.0f) },
-            new GradientAlphaKey[] { new GradientAlphaKey(0.8f, 0.0f), new GradientAlphaKey(0.0f, 1.0f) }
-        );
-        tr.colorGradient = grad;
+        // 拖尾視覺特效改由 BallTrail3D 管理 (使用此 TrailRenderer 當核心光帶 + 光暈帶 + 火花粒子)
+        BallTrail3D fx = GetComponent<BallTrail3D>();
+        if (fx == null) fx = gameObject.AddComponent<BallTrail3D>();
+        fx.ApplySkin(themeColor);
     }
 
     void Update()
@@ -275,6 +246,8 @@ public class RollingSkyBallController : MonoBehaviour
     void FixedUpdate()
     {
         if (isDead) return;
+        // 剛體被設為 Kinematic 時 (教學完成畫面、通關/死亡凍結) 不可設定速度，否則每幀噴出警告
+        if (rb == null || rb.isKinematic) return;
 
         if (isSkyTowerMode)
         {
@@ -324,17 +297,8 @@ public class RollingSkyBallController : MonoBehaviour
             // 常規跑酷與無盡模式：計算水平速度與固定向前速度
             float targetVx = currentHorizontalInput * horizontalSpeed;
 
-            // 【常規模式與無盡模式左右平衡微風擾動】：
-            // 幅度加大至 2.4f，一般關卡與無盡模式均啟用正弦側風飄移，考驗玩家動態平衡微調！
-            if (enableSway)
-            {
-                currentSwayForce = Mathf.Sin(Time.time * swayFrequency + transform.position.z * 0.14f) * swayIntensity;
-                targetVx += currentSwayForce;
-            }
-            else
-            {
-                currentSwayForce = 0f;
-            }
+            // 自動左右飄移 (Sway) 已移除：側向速度僅來自玩家輸入。
+            currentSwayForce = 0f;
 
             Vector3 vel = rb.linearVelocity;
             vel.x = targetVx;
